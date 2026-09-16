@@ -69,3 +69,27 @@ One block per run: config hash, command, key printed lines.
   - saved figures/phase4_{main_figure,stress1_assumption1,stress2_support_shift,stress3_small_n}_8e4fef38.png,
     all opened.
 - `python -m pytest tests/ -v` -> unchanged: 1 failed (T7, documented), 9 passed.
+
+## Phase 5 (branch phase-5-deliverable)
+- CP5 slide text proposed and approved (`Go`; notes/decisions.md).
+- `python -m fusion.render_slides` -> saved slides/deck.pptx, slides/deck.md.
+- Rendering environment note: `soffice --convert-to pdf/png` initially failed on EVERY input,
+  even a plain .txt file, with "Error: source file could not be loaded" -- `dpkg -l` showed only
+  `libreoffice-core`/`libreoffice-common` installed, not `libreoffice-impress` (no Impress import
+  filter registered). Fixed with `apt-get install -y libreoffice-impress poppler-utils` (both
+  installs succeeded after `apt-get update`, which resolved an initial 404 on a stale index).
+  After the fix: `soffice --convert-to pdf` -> deck.pdf; `pdftoppm -png` -> slide-{1,2,3}.png.
+- Opened all 3 rendered slide PNGs. First pass showed multi-line bullet strings (ones I'd
+  manually pre-wrapped with a leading "  ") rendering as spurious extra dashed bullets instead of
+  wrapped continuation text; fixed by joining each bullet into one string and letting
+  `word_wrap=True` handle wrapping, then rebuilt and re-rendered -- confirmed clean on re-open:
+  - Slide 1 "The data-generating process": 4 bullets (DGP, selection, S_t/m/M/n, shrinking bias)
+    + figures/phase1a_densities_4b6ab92b.png (3 panels, t=1/6/9), all legible.
+  - Slide 2 "Optimization pipeline": 5 bullets (loss, model, Adam settings, CP3 fix, diagnostics
+    gate) + figures/phase3_val_curve_8e4fef38.png (smooth post-CP3 curve), all legible.
+  - Slide 3 "Comparison and learnings": 4 bullets (headline + 3 learnings) +
+    figures/phase4_main_figure_8e4fef38.png, all legible.
+- notes/talk_through.md: 10 bullets written, mapping each slide to its code files and
+  docs/math_fixed.md step numbers.
+- Final `python -m pytest tests/ -v` -> 1 failed (T7, documented at CP2, unchanged throughout),
+  9 passed (T1,T2,T3,T4,T5,T6,T8,T9,T10).

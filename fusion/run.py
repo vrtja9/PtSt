@@ -267,8 +267,17 @@ def main():
             print(f"  n={r['n']}: sd(mu_tilde)={r['sd_mu_tilde']:.4f} mean_n_eff={r['mean_n_eff']:.1f}")
         for path in out["saved"]:
             print("saved:", path)
-    else:
-        raise NotImplementedError(f"phase {args.phase} not implemented yet")
+    elif args.phase == 5:
+        from fusion.render_slides import SLIDES_DIR, build_markdown_fallback, build_pptx
+        import os as _os
+
+        _os.makedirs(SLIDES_DIR, exist_ok=True)
+        pptx_path = _os.path.join(SLIDES_DIR, "deck.pptx")
+        md_path = _os.path.join(SLIDES_DIR, "deck.md")
+        build_pptx(pptx_path)
+        build_markdown_fallback(md_path)
+        print("saved:", pptx_path)
+        print("saved:", md_path)
 
 
 if __name__ == "__main__":
