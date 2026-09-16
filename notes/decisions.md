@@ -54,3 +54,13 @@ CP3's own reply templates don't include "iterate again" and none was requested) 
 t=2,3 FOC gap and the still-flattish α̃ vs α* shape are recorded honestly in
 notes/derivations.md rather than hidden. If revisited: `fusion/config.py`'s `lr`/`theta_bounded`
 fields are the edit points; re-run `python -m fusion.run --phase 3` and re-open the three figures.
+
+## CP4 — stress test selection (2026-09-16)
+Reply: `Default` (all three of docs/math_fixed.md §E). Implemented in `fusion/evaluate.py`:
+(1) Assumption 1 broken (`π_t(y)=σ(a_t+b_t y)`, `b_t=1.5+0.1(t−m)`, t>m only);
+(2) support shift (`m_t`+2σ, t>m only); (3) small n (`n∈{200,500,2000}`, sd of μ̃ over 10 seeds).
+Design choice for (3), not fully pinned by the kickoff prompt: the trained θ̃ from the Phase 3
+CP3-adopted run is held FIXED, and only the S_t draw seed varies across the 10 replicates per n
+(isolating estimator/sampling variance from training variance, and keeping the test's cost to a
+few hundred forward passes instead of 30 full retrains). If a training-variance version is
+wanted instead: `fusion/evaluate.stress_test_small_n` is the only function to change.
