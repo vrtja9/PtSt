@@ -64,3 +64,11 @@ CP3-adopted run is held FIXED, and only the S_t draw seed varies across the 10 r
 (isolating estimator/sampling variance from training variance, and keeping the test's cost to a
 few hundred forward passes instead of 30 full retrains). If a training-variance version is
 wanted instead: `fusion/evaluate.stress_test_small_n` is the only function to change.
+
+## CP5 — slide text (2026-09-16)
+Proposed 3-slide text (docs/challenge_text.md §4) sent to the user; **reply: `Go`**. Slide 1:
+DGP + `figures/phase1a_densities_*.png`. Slide 2: optimization pipeline (loss, Adam, bounded
+ThetaNet, FOC/θ̃-vs-θ* diagnostics) + `figures/phase3_val_curve_*.png`. Slide 3: comparison +
+3 learnings (μ̃ beats both baselines; unbounded nets can blow up in sparse tails; Assumption-1
+violation biases μ̃ in a non-obvious direction) + `figures/phase4_main_figure_*.png`. Rendered in
+`fusion/render_slides.py` (python-pptx) to `slides/deck.pptx`.
