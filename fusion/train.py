@@ -42,7 +42,7 @@ def train(cfg: Config, T: np.ndarray, Z: np.ndarray, Y: np.ndarray,
     T_t = torch.as_tensor(T, dtype=torch.int64)
     Z_t = torch.as_tensor(Z)
 
-    theta_net = ThetaNet(cfg.H)
+    theta_net = ThetaNet(cfg.H, bounded=cfg.theta_bounded)
     alpha_table = AlphaTable(cfg.m)
     opt = torch.optim.Adam([
         {"params": theta_net.parameters(), "weight_decay": cfg.wd},

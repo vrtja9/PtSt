@@ -40,16 +40,19 @@ class Config:
     c_t_intercept: float = 0.9    # c_t(t) = c_t_intercept + c_t_slope * t, c_t in (0,1]
     c_t_slope: float = -0.06
 
-    # --- DECISION (Phase 3 default, docs/math_fixed.md §F "already run" settings): these
-    # gave FOC 0.98-1.03 in the numpy twin *when the twin itself used them* (fusion_numpy.py's
-    # own CFG differs: lr=1e-2, wd=1e-4, epochs=150 -- see LOG.md Phase 0 entry). Treated here
-    # as the first-run proposal for CP3, not yet re-validated with the torch pipeline; CP3 may
-    # revise any of the five fields below based on the FOC table and theta~ vs theta* figure. ---
-    H: int = 32                   # ThetaNet hidden width (1 -> H -> H -> 1)
-    lr: float = 3e-3
+    # --- DECISION (CP3, notes/decisions.md, 2026-09-16): the docs/math_fixed.md §F first-run
+    # proposal (lr=3e-3, unbounded ThetaNet) gave a noisy/spiky val curve still descending at
+    # epoch ~400 (Step 9's "R_hat_n unbounded below" warning made concrete) and theta~ blowing
+    # up to ~380 at y=-6 vs theta*'s <50 there -- an unstable tail extrapolation. User adopted
+    # the proposed fix: lr lowered to 1e-3, and ThetaNet given a bounded head (theta_bounded).
+    # Downstream if revisited: re-run fusion.run --phase 3 and re-check the val curve, FOC table,
+    # and theta~ vs theta* figure exactly as this decision was evidenced (LOG.md, "Phase 3"). ---
+    H: int = 32                   # ThetaNet hidden width (1 -> H -> 1)
+    lr: float = 1e-3
     wd: float = 1e-5
     epochs: int = 400
     batch: int = 256
+    theta_bounded: float = 20.0   # ThetaNet(H, bounded=theta_bounded); None = unbounded (pre-CP3)
     val_frac: float = 0.2         # stratified 80/20 split inside every (t,z) cell
 
     # --- DECISION: two independent RNG streams (CLAUDE.md §2.4), never shared, so that

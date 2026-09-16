@@ -168,3 +168,35 @@ effective sample size, small when a few survey points dominate the weight mass.
   padding n past the spec's stated value.
 - T8 (anchor): PASSED — `alpha_table.forward()[-1].item() == 0.0` exactly after 100 Adam steps
   (guaranteed structurally by the frozen-buffer design, not by convergence).
+
+## Phase 3 evidence (training, diagnostics, estimation; CP3 = `Adopt`)
+
+First run at the docs/math_fixed.md §F proposal (`lr=3e-3`, unbounded `ThetaNet`): validation
+curve noisy/spiky and still descending through epoch ~395 (an empirical instance of Step 9's
+"`R̂_n` unbounded below for an interpolating θ" warning), FOC
+`{1:1.079,2:1.106,3:1.0,4:1.027,5:1.045,6:1.012}` (3/6 years outside ±0.03), and `θ̃` exploding to
+≈380 at `y=−6` against `θ*`'s <50 there — an unconstrained extrapolation into the sparse left
+tail, well outside where any year's `m_t` (`m_t(1)=−0.25` .. `m_t(9)=1.75`) puts real mass.
+Proposed and adopted at CP3: `lr` 3e-3→1e-3, `ThetaNet` given a bounded head (`theta_bounded=20`,
+i.e. `θ = 20·tanh(raw/20)`). Re-run: validation curve smooth and monotone (no spikes), `θ̃`
+plateaus at 20 instead of exploding, FOC `{1:1.005,2:0.958,3:0.963,4:1.012,5:1.025,6:0.974}`
+(t=2,3 still marginally outside ±0.03 — a residual, honestly reported, not hidden), `α̃` still
+visibly flatter than `α*` (crosses it near t=3) — matching docs/math_fixed.md §F's own caveat
+that "`α̃` still off `α*` by ≤0.08 in early years (low-y tail under-fit)."
+
+Estimate table (t=m+1..M, `fusion.run --phase 3`, n=2000, config hash `8e4fef38`):
+
+| t | μ(t) true | survey mean | μ̃(t) | SE (bootstrap) | n_eff/n | offset baseline | oracle |
+|---|---|---|---|---|---|---|---|
+| 7 | 1.250 | 1.500 | 1.325 | 0.0338 | 0.82 | 1.243 | 1.306 |
+| 8 | 1.500 | 1.647 | 1.476 | 0.0324 | 0.83 | 1.391 | 1.454 |
+| 9 | 1.750 | 1.858 | 1.752 | 0.0309 | 0.88 | 1.601 | 1.734 |
+
+`μ̃(t)` sits closer to the truth than the raw survey mean at every t (e.g. t=9: |1.752−1.75| vs
+|1.858−1.75|), and closer than the offset baseline at t=8,9 (the offset baseline's constant-bias
+assumption fails as the survey bias shrinks over time, by DGP design — docs/math_fixed.md §D).
+
+- T9 (oracle estimator): PASSED — `|oracle−μ(t)| < 3·SE` (bootstrap SE with θ* fixed) for
+  t∈{7,8,9}, n=20k.
+- T10 (trained estimator, report then assert loosely): PASSED — FOC within ±0.05 for all t≤m
+  (same run as above); `|μ̃(t)−oracle μ̃(t)|` = 0.0191, 0.0168, 0.0189 for t=7,8,9, all < 0.05.
