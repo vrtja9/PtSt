@@ -40,3 +40,17 @@ shrinks with n) stays in notes/derivations.md "Phase 2 evidence" and LOG.md as t
 record of why this is treated as known finite-sample MC variance, not a defect, and why Phase 3
 proceeded without re-touching T7. If revisited later: the three literal values above
 (`n`, `seed_data`, `0.02`) in that one test function are the only edit points.
+
+## CP3 — first training run, hyperparameters (2026-09-16)
+Evidence at `lr=3e-3` (unbounded ThetaNet): noisy/spiky val curve still descending at epoch
+~395, FOC `{1:1.079,2:1.106,3:1.0,4:1.027,5:1.045,6:1.012}` (3/6 outside ±0.03), θ̃ blowing up to
+~380 at y=-6 vs θ*'s <50. Proposed default: `lr=1e-3` + bounded head `B=20`. **Reply: `Adopt`.**
+Changed in `fusion/config.py`: `lr` 3e-3→1e-3, added `theta_bounded=20.0` field (see the
+`# DECISION (CP3...)` comment there); `fusion/train.py` now constructs `ThetaNet(cfg.H,
+bounded=cfg.theta_bounded)`. Re-run evidence: val curve smooth/monotone (no spikes), θ̃ plateaus
+at 20 instead of exploding, FOC `{1:1.005,2:0.958,3:0.963,4:1.012,5:1.025,6:0.974}` (2/6 still
+marginally outside ±0.03: t=2,3). Judged good enough to proceed (large, qualitative improvement;
+CP3's own reply templates don't include "iterate again" and none was requested) — the residual
+t=2,3 FOC gap and the still-flattish α̃ vs α* shape are recorded honestly in
+notes/derivations.md rather than hidden. If revisited: `fusion/config.py`'s `lr`/`theta_bounded`
+fields are the edit points; re-run `python -m fusion.run --phase 3` and re-open the three figures.

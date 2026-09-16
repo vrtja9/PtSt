@@ -17,6 +17,9 @@ import numpy as np
 
 from fusion.config import Config, git_commit_hash
 from fusion import dgp
+from fusion.data import build_dataset, stratified_split
+from fusion.train import train, foc_diagnostic, theta_grid_data
+from fusion.estimate import mu_tilde, survey_mean_baseline, offset_baseline, oracle_estimate, bootstrap_se
 
 FIGURES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "figures")
 
@@ -81,6 +84,77 @@ def phase1_figures(cfg: Config) -> list[str]:
     return saved
 
 
+def phase3_run(cfg: Config):
+    """Phase 3 step 2: first training run + validation curve, FOC table, alpha~ vs alpha*,
+    theta~ vs theta* figure. Returns (train_result, foc, saved_figure_paths)."""
+    data_rng = np.random.default_rng(cfg.seed_data)
+    T, Z, Y = build_dataset(data_rng, cfg)
+    tr_mask, va_mask = stratified_split(data_rng, T, Z, cfg.val_frac)
+    result = train(cfg, T, Z, Y, tr_mask, va_mask)
+    foc = foc_diagnostic(cfg, result.theta_net, result.alpha_table, T, Z, Y, result.standardizer)
+
+    saved = []
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(result.history["train_loss"], label="train")
+    ax.plot(result.history["val_loss"], label="val")
+    ax.axvline(result.best_epoch, color="gray", linestyle=":", label=f"best (epoch {result.best_epoch})")
+    ax.set_xlabel("epoch")
+    ax.set_ylabel("fusion_loss")
+    ax.legend(fontsize=8)
+    fig.suptitle("Phase 3: validation curve")
+    saved.append(_save_with_config(fig, "phase3_val_curve", cfg))
+    plt.close(fig)
+
+    ts = np.arange(1, cfg.m + 1)
+    alpha_hat = result.alpha_table.forward().detach().numpy()
+    alpha_star = dgp.alpha_star(cfg, ts)
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.plot(ts, alpha_hat, marker="o", label="alpha~(t)")
+    ax.plot(ts, alpha_star, marker="s", label="alpha*(t)")
+    ax.set_xlabel("t")
+    ax.legend(fontsize=8)
+    fig.suptitle("Phase 3: alpha~ vs alpha*")
+    saved.append(_save_with_config(fig, "phase3_alpha_hat_vs_star", cfg))
+    plt.close(fig)
+
+    grid = theta_grid_data(cfg, result.theta_net, result.standardizer)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(grid["y"], grid["theta_hat"], label="theta~(y)")
+    ax.plot(grid["y"], grid["theta_star"], label="theta*(y)")
+    ax.set_xlabel("y")
+    ax.legend(fontsize=8)
+    fig.suptitle("Phase 3: theta~ vs theta* (y-grid spans all S_t supports, t=1..M)")
+    saved.append(_save_with_config(fig, "phase3_theta_hat_vs_star", cfg))
+    plt.close(fig)
+
+    return result, foc, saved, data_rng, T, Z, Y
+
+
+def phase3_table(cfg: Config, result, T, Z, Y, data_rng) -> list[dict]:
+    """Phase 3 step 3-4: table for t=m+1..M (mu, survey mean, mu~+-SE, n_eff/n, offset, oracle)."""
+    survey_mean_m = float(Y[(T == cfg.m) & (Z == 0.0)].mean())
+    mu_m_true = float(dgp.mu_true(cfg, cfg.m))
+
+    rows = []
+    for t in range(cfg.m + 1, cfg.M + 1):
+        y_t = dgp.draw_survey(cfg, data_rng, t, cfg.n)
+        survey_mean_t = survey_mean_baseline(y_t)
+        est, n_eff_frac = mu_tilde(result.theta_net, result.standardizer, y_t)
+        se = bootstrap_se(result.theta_net, result.standardizer, y_t, n_boot=200, rng=data_rng)
+        rows.append({
+            "t": t,
+            "mu_true": float(dgp.mu_true(cfg, t)),
+            "survey_mean": survey_mean_t,
+            "mu_tilde": est,
+            "se": se,
+            "n_eff_over_n": n_eff_frac,
+            "offset": offset_baseline(mu_m_true, survey_mean_m, survey_mean_t),
+            "oracle": oracle_estimate(cfg, y_t),
+        })
+    return rows
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--phase", type=int, required=True, choices=[1, 2, 3, 4, 5])
@@ -90,6 +164,18 @@ def main():
     if args.phase == 1:
         for path in phase1_figures(cfg):
             print("saved:", path)
+    elif args.phase == 3:
+        result, foc, saved, data_rng, T, Z, Y = phase3_run(cfg)
+        print("best_epoch:", result.best_epoch, "best_val_loss:", result.best_val_loss)
+        print("FOC:", {k: round(v, 3) for k, v in foc.items()})
+        for path in saved:
+            print("saved:", path)
+        rows = phase3_table(cfg, result, T, Z, Y, data_rng)
+        print(f"\n{'t':>2} {'mu_true':>8} {'survey_mean':>11} {'mu_tilde':>9} {'SE':>7} "
+              f"{'n_eff/n':>7} {'offset':>8} {'oracle':>8}")
+        for r in rows:
+            print(f"{r['t']:>2} {r['mu_true']:>8.3f} {r['survey_mean']:>11.3f} {r['mu_tilde']:>9.3f} "
+                  f"{r['se']:>7.4f} {r['n_eff_over_n']:>7.2f} {r['offset']:>8.3f} {r['oracle']:>8.3f}")
     else:
         raise NotImplementedError(f"phase {args.phase} not implemented yet")
 

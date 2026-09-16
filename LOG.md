@@ -37,3 +37,18 @@ One block per run: config hash, command, key printed lines.
   alpha_star| = 0.0309, 0.0430, 0.0444, 0.0380` (all 4 seeds fail the alpha criterion, 3 of 4
   fail the a criterion). `n=200k,800k,3.2M` at seed=0 -> `|a-1| = 0.0255, 0.0010, 0.0062`;
   max`|alpha_hat-alpha_star| = 0.0309, 0.0169, 0.0111` (shrinking with n).
+
+## Phase 3 (branch phase-3-training-estimation)
+- First run (lr=3e-3, unbounded, config hash 4b6ab92b): `python -m fusion.run --phase 3` ->
+  best_epoch 395, FOC {1:1.079,2:1.106,3:1.0,4:1.027,5:1.045,6:1.012}. Opened figures: val curve
+  spiky/still-descending at ep.395; alpha~ flatter than alpha*, crosses near t=3; theta~ blows up
+  to ~380 at y=-6 vs theta*'s <50. Raised at CP3; user replied `Adopt` (lr->1e-3, bounded head B=20).
+- Re-run (lr=1e-3, bounded=20, config hash 8e4fef38): best_epoch 399, best_val_loss 0.2034,
+  FOC {1:1.005,2:0.958,3:0.963,4:1.012,5:1.025,6:0.974}. Val curve smooth/monotone (no spikes);
+  theta~ plateaus at 20 instead of exploding.
+  Estimate table (t=7,8,9): mu_true=1.25/1.5/1.75; survey_mean=1.500/1.647/1.858;
+  mu_tilde=1.325/1.476/1.752 (SE 0.0338/0.0324/0.0309, n_eff/n 0.82/0.83/0.88);
+  offset=1.243/1.391/1.601; oracle=1.306/1.454/1.734.
+- `python -m pytest tests/ -v` -> 1 failed (T7, unchanged/documented), 9 passed: T1-T6,T8 (Phase
+  1-2), T9 PASSED (oracle vs truth < 3*SE, n=20k), T10 PASSED (FOC within +-0.05 for t<=m;
+  |mu_tilde(t)-oracle(t)| = 0.0191/0.0168/0.0189 for t=7,8,9, all < 0.05).
