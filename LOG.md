@@ -52,3 +52,20 @@ One block per run: config hash, command, key printed lines.
 - `python -m pytest tests/ -v` -> 1 failed (T7, unchanged/documented), 9 passed: T1-T6,T8 (Phase
   1-2), T9 PASSED (oracle vs truth < 3*SE, n=20k), T10 PASSED (FOC within +-0.05 for t<=m;
   |mu_tilde(t)-oracle(t)| = 0.0191/0.0168/0.0189 for t=7,8,9, all < 0.05).
+
+## Phase 4 (branch phase-4-evaluation-stress-tests, config hash 8e4fef38)
+- `python -m fusion.run --phase 4` (30.99s):
+  - in_sample_check (t<=m): mu_tilde tracks mu_true closely, e.g. t=6: 1.000 vs 1.000, t=5: 0.749
+    vs 0.750.
+  - stress 1 (Assumption 1 broken): bias -0.303/-0.295/-0.127 at |b_drift|=0.10/0.20/0.30 --
+    magnitude SHRINKS as drift grows, opposite of docs/math_fixed.md §E.1's stated expectation
+    (see notes/derivations.md "Phase 4 evidence and failure modes" for the disclosed reason:
+    a_t is coupled to t in this perturbation, not held fixed).
+  - stress 2 (support shift, +2sigma): frac outside training range 4.0%/6.7%/11.5% (t=7,8,9,
+    7.4% pooled), bias only +0.057/+0.040/+0.055 -- small despite ~10% extrapolated mass,
+    plausibly because CP3's bounded head (theta_bounded=20) keeps theta~'s extrapolation gentle.
+  - stress 3 (small n, theta~ fixed, 10 seeds/n): sd(mu_tilde) = 0.0583/0.0468/0.0186 at
+    n=200/500/2000 (mean n_eff 190.0/472.9/1787.2), close to the 1/sqrt(n) reference line.
+  - saved figures/phase4_{main_figure,stress1_assumption1,stress2_support_shift,stress3_small_n}_8e4fef38.png,
+    all opened.
+- `python -m pytest tests/ -v` -> unchanged: 1 failed (T7, documented), 9 passed.
