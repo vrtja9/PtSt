@@ -16,3 +16,24 @@ One block per run: config hash, command, key printed lines.
   Opened both: (a) s_t visibly right-shifted from p_t at t=1, nearly coincides with p_t by t=9,
   π_t's sigmoid shifts right and its plateau shrinks as t grows; (b) mu(t) rises linearly while
   E_St[Y] sits above it with a shrinking gap, rho_bar_t is a low non-monotone hump (~0.35-0.45).
+
+## Phase 2 (branch phase-2-data-model-loss)
+- Uncertainty raised and resolved before coding: ThetaNet architecture conflict between
+  CLAUDE.md §3 ("1->H->H->1") and fusion_numpy.py's actual init_params/theta_of ("1->H->1",
+  which T4 requires bit-exact). User answered "Yes" to option A (match the twin). Logged in
+  notes/decisions.md.
+- `python -m pytest tests/ -v` -> **1 failed, 7 passed** (5.23s):
+  - test_T1/T2/T3 (Phase 1): PASSED.
+  - test_T4_numpy_twin_agreement: PASSED (|r diff|<1e-8, |L diff|<1e-10, all grads <1e-8).
+  - test_T5_gradcheck_tiny_net: PASSED.
+  - test_T6_joint_convexity_midpoint: PASSED.
+  - test_T7_parametric_recovery_lbfgs: **FAILED** -- `assert abs(a.item()-1.0) < 0.02` ->
+    `0.025452701852180626 < 0.02` is False (a=1.0254527018521806). See notes/derivations.md
+    "Phase 2 evidence" for the full diagnostic (converged L-BFGS solution, gradient norm ~1e-8;
+    4-seed and 3-n sweep showing the error shrinks with n, consistent with MC noise not a bug).
+  - test_T8_anchor_exactly_zero_after_training: PASSED.
+- Diagnostic sweep (not part of the committed test suite, run interactively):
+  `seed_data=0,1,2,3` at n=200k -> `|a-1| = 0.0255, 0.0567, 0.0247, 0.0002`; max`|alpha_hat-
+  alpha_star| = 0.0309, 0.0430, 0.0444, 0.0380` (all 4 seeds fail the alpha criterion, 3 of 4
+  fail the a criterion). `n=200k,800k,3.2M` at seed=0 -> `|a-1| = 0.0255, 0.0010, 0.0062`;
+  max`|alpha_hat-alpha_star| = 0.0309, 0.0169, 0.0111` (shrinking with n).
