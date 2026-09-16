@@ -16,3 +16,16 @@ P_{t,Y} = N(m_t, σ²), σ=1; π_t(y) = c_t·Φ(βy), β=1.5; m_t=−0.5+0.25t; 
 n=2000. Implemented in `fusion/config.py` (the numeric constants) and `fusion/dgp.py` (the
 functions). If this changes: `fusion/config.py` defaults are the single edit point; everything
 downstream that must be re-run is listed in the `# DECISION` comment next to those fields.
+
+## Uncertainty raised mid-Phase-2 — ThetaNet architecture (2026-09-16)
+Raised per CLAUDE.md §2.1/§2.2 before writing `fusion/model.py`: CLAUDE.md §3 states
+`θ = MLP(1→H→H→1, ReLU)` (two hidden layers), but `fusion_numpy.py`'s `init_params`/`theta_of`
+(the numpy twin T4 must agree with bit-for-bit) implement a single hidden layer only
+(`W1:(H,1), b1:(H,), w2:(H,), b2:scalar`), and T4 requires loading those exact shapes. The two
+cannot both be literally true. Options offered: (A) implement `1→H→1` matching the twin, treating
+the `1→H→H→1` line in §3 as a compression error [recommended, since T4 is mechanically
+unsatisfiable otherwise]; (B) implement the literal two-hidden-layer net and let T4 fail/be
+reinterpreted. **Reply: A.** `fusion/model.py`'s `ThetaNet` is therefore `1→H→1`, matching
+`fusion_numpy.py` exactly. If this is ever revisited (e.g. a real second hidden layer is wanted):
+`ThetaNet.__init__`/`forward` in `fusion/model.py` are the only edit points, but T4 would then
+need a different agreement check (the twin does not have a second-layer analogue to compare against).
