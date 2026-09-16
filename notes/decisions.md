@@ -29,3 +29,14 @@ reinterpreted. **Reply: A.** `fusion/model.py`'s `ThetaNet` is therefore `1→H�
 `fusion_numpy.py` exactly. If this is ever revisited (e.g. a real second hidden layer is wanted):
 `ThetaNet.__init__`/`forward` in `fusion/model.py` are the only edit points, but T4 would then
 need a different agreement check (the twin does not have a second-layer analogue to compare against).
+
+## CP2 — Phase 2 tests (2026-09-16)
+Reply: `Default` (accept T7 as documented). `python -m pytest tests/` result kept as-is: 7 passed
+(T1-T6, T8), T7 FAILED at the literally-specified n=200k/seed_data=0/tol=0.02 (`a=1.0255`). No
+code changed to force a pass — `tests/test_model_loss.py::test_T7_parametric_recovery_lbfgs`
+keeps `n=200_000`, `Config()` default `seed_data=0`, and the `0.02` thresholds exactly as
+CLAUDE.md §5 states them. The diagnostic evidence (4-seed sweep, 3-n sweep showing the error
+shrinks with n) stays in notes/derivations.md "Phase 2 evidence" and LOG.md as the permanent
+record of why this is treated as known finite-sample MC variance, not a defect, and why Phase 3
+proceeded without re-touching T7. If revisited later: the three literal values above
+(`n`, `seed_data`, `0.02`) in that one test function are the only edit points.
