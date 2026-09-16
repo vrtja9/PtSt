@@ -20,6 +20,7 @@ from fusion import dgp
 from fusion.data import build_dataset, stratified_split
 from fusion.train import train, foc_diagnostic, theta_grid_data
 from fusion.estimate import mu_tilde, survey_mean_baseline, offset_baseline, oracle_estimate, bootstrap_se
+from fusion import evaluate
 
 FIGURES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "figures")
 
@@ -155,6 +156,77 @@ def phase3_table(cfg: Config, result, T, Z, Y, data_rng) -> list[dict]:
     return rows
 
 
+def phase4_run(cfg: Config):
+    """Phase 4: main_figure, in_sample_check, the three CP4 stress tests, one figure each."""
+    data_rng = np.random.default_rng(cfg.seed_data)
+    T, Z, Y = build_dataset(data_rng, cfg)
+    tr_mask, va_mask = stratified_split(data_rng, T, Z, cfg.val_frac)
+    result = train(cfg, T, Z, Y, tr_mask, va_mask)
+    train_y_range = (float(Y.min()), float(Y.max()))
+
+    saved = []
+
+    # main_figure: mu(t), E_St[Y], mu~(t)+-SE, offset baseline, t>m shaded
+    rows = evaluate.main_figure_data(cfg, result.theta_net, result.standardizer, data_rng)
+    ts = [r["t"] for r in rows]
+    fig, ax = plt.subplots(figsize=(7, 4))
+    ax.axvspan(cfg.m + 0.5, cfg.M + 0.5, color="gray", alpha=0.15, label="t>m (extrapolation)")
+    ax.plot(ts, [r["mu_true"] for r in rows], marker="o", label="mu(t) true")
+    ax.plot(ts, [r["survey_mean"] for r in rows], marker="s", label="E_St[Y] survey mean")
+    ax.errorbar(ts, [r["mu_tilde"] for r in rows], yerr=[r["se"] for r in rows],
+                marker="^", label="mu~(t) +- bootstrap SE", capsize=3)
+    ax.plot(ts, [r["offset"] for r in rows], marker="v", linestyle="--", label="offset baseline")
+    ax.set_xlabel("t")
+    ax.legend(fontsize=7)
+    fig.suptitle("Phase 4: main figure -- mu(t) vs E_St[Y] vs mu~(t) vs offset baseline")
+    saved.append(_save_with_config(fig, "phase4_main_figure", cfg))
+    plt.close(fig)
+    in_sample = evaluate.in_sample_check(rows, cfg)
+
+    # Stress test 1: Assumption 1 broken
+    st1 = evaluate.stress_test_assumption1_broken(cfg, result.theta_net, result.standardizer, data_rng)
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ax.plot([r["abs_b_drift"] for r in st1], [r["bias"] for r in st1], marker="o")
+    ax.set_xlabel("|b_t - beta| (selection-slope drift)")
+    ax.set_ylabel("mu~(t) - mu(t) (bias)")
+    fig.suptitle("Stress 1: Assumption 1 broken -- bias vs selection drift")
+    saved.append(_save_with_config(fig, "phase4_stress1_assumption1", cfg))
+    plt.close(fig)
+
+    # Stress test 2: support shift
+    st2 = evaluate.stress_test_support_shift(cfg, result.theta_net, result.standardizer, data_rng, train_y_range)
+    fig, ax = plt.subplots(figsize=(6, 4))
+    all_y = np.concatenate([r["y_sample"] for r in st2])
+    ax.hist(all_y, bins=60, alpha=0.7)
+    ax.axvline(train_y_range[0], color="red", linestyle="--", label="training y-range")
+    ax.axvline(train_y_range[1], color="red", linestyle="--")
+    overall_frac = float(np.mean((all_y < train_y_range[0]) | (all_y > train_y_range[1])))
+    ax.set_xlabel("y")
+    ax.legend(fontsize=8)
+    fig.suptitle(f"Stress 2: support shift (+2sigma), {overall_frac:.1%} of t>m survey values outside training range")
+    saved.append(_save_with_config(fig, "phase4_stress2_support_shift", cfg))
+    plt.close(fig)
+    for r in st2:
+        del r["y_sample"]  # not JSON/print friendly; frac_outside_train_range already captures it
+
+    # Stress test 3: small n
+    st3 = evaluate.stress_test_small_n(cfg, result.theta_net, result.standardizer, t=cfg.M)
+    fig, ax = plt.subplots(figsize=(5, 4))
+    ns = [r["n"] for r in st3]
+    sds = [r["sd_mu_tilde"] for r in st3]
+    ax.loglog(ns, sds, marker="o", label="observed sd(mu~)")
+    ref = sds[0] * np.sqrt(ns[0] / np.array(ns))
+    ax.loglog(ns, ref, linestyle="--", label="1/sqrt(n) reference")
+    ax.set_xlabel("n")
+    ax.set_ylabel(f"sd(mu~(t={cfg.M})) over {10} seeds")
+    ax.legend(fontsize=8)
+    fig.suptitle("Stress 3: small n -- sd(mu~) vs n")
+    saved.append(_save_with_config(fig, "phase4_stress3_small_n", cfg))
+    plt.close(fig)
+
+    return {"in_sample": in_sample, "st1": st1, "st2": st2, "st3": st3, "saved": saved}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--phase", type=int, required=True, choices=[1, 2, 3, 4, 5])
@@ -176,6 +248,25 @@ def main():
         for r in rows:
             print(f"{r['t']:>2} {r['mu_true']:>8.3f} {r['survey_mean']:>11.3f} {r['mu_tilde']:>9.3f} "
                   f"{r['se']:>7.4f} {r['n_eff_over_n']:>7.2f} {r['offset']:>8.3f} {r['oracle']:>8.3f}")
+    elif args.phase == 4:
+        out = phase4_run(cfg)
+        print("in_sample_check (t<=m):")
+        for r in out["in_sample"]:
+            print(f"  t={r['t']}: mu_true={r['mu_true']:.3f} mu_tilde={r['mu_tilde']:.3f} "
+                  f"survey_mean={r['survey_mean']:.3f}")
+        print("stress 1 (Assumption 1 broken):")
+        for r in out["st1"]:
+            print(f"  t={r['t']}: mu_true={r['mu_true']:.3f} mu_tilde={r['mu_tilde']:.3f} "
+                  f"bias={r['bias']:+.3f} |b_drift|={r['abs_b_drift']:.2f}")
+        print("stress 2 (support shift):")
+        for r in out["st2"]:
+            print(f"  t={r['t']}: mu_true_shifted={r['mu_true_shifted']:.3f} mu_tilde={r['mu_tilde']:.3f} "
+                  f"bias={r['bias']:+.3f} frac_outside_train_range={r['frac_outside_train_range']:.2%}")
+        print("stress 3 (small n):")
+        for r in out["st3"]:
+            print(f"  n={r['n']}: sd(mu_tilde)={r['sd_mu_tilde']:.4f} mean_n_eff={r['mean_n_eff']:.1f}")
+        for path in out["saved"]:
+            print("saved:", path)
     else:
         raise NotImplementedError(f"phase {args.phase} not implemented yet")
 

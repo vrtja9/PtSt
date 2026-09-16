@@ -1,0 +1,24 @@
+{
+  "commit": "333a046",
+  "config": {
+    "H": 32,
+    "M": 9,
+    "batch": 256,
+    "beta": 1.5,
+    "c_t_intercept": 0.9,
+    "c_t_slope": -0.06,
+    "epochs": 400,
+    "lr": 0.001,
+    "m": 6,
+    "m_t_intercept": -0.5,
+    "m_t_slope": 0.25,
+    "n": 2000,
+    "seed_data": 0,
+    "seed_model": 1,
+    "sigma": 1.0,
+    "theta_bounded": 20.0,
+    "val_frac": 0.2,
+    "wd": 1e-05
+  },
+  "figure": "phase4_stress3_small_n_8e4fef38"
+}

@@ -200,3 +200,43 @@ assumption fails as the survey bias shrinks over time, by DGP design — docs/ma
   t∈{7,8,9}, n=20k.
 - T10 (trained estimator, report then assert loosely): PASSED — FOC within ±0.05 for all t≤m
   (same run as above); `|μ̃(t)−oracle μ̃(t)|` = 0.0191, 0.0168, 0.0189 for t=7,8,9, all < 0.05.
+
+## Phase 4 evidence and failure modes (CP4 = `Default`, all three stress tests)
+
+**Main figure** (`figures/phase4_main_figure_*.png`, opened): `μ̃(t)` (green) tracks `μ(t)` true
+(blue) closely across every t, both in-sample (t≤m) and in the shaded t>m region, visibly closer
+to the truth than both the survey mean (orange, biased high throughout by construction) and the
+offset baseline (red dashed, which undershoots by t=9 as the survey bias shrinks over time,
+violating the offset baseline's constant-bias assumption — by DGP design, docs/math_fixed.md §D).
+**In-sample check** (t≤m, where `P_t` is directly observed so the truth is known without any
+correction): `μ̃(t)` tracks `μ(t)` reasonably (e.g. t=6: 1.000 vs 1.000 exactly; t=5: 0.749 vs
+0.750), confirming the estimator isn't just "getting lucky" on the extrapolation years.
+
+**Stress 1 — Assumption 1 broken** (`π_t(y)=σ(a_t+b_t y)`, `b_t=β+0.1(t−m)`, t>m only). Math
+predicts (docs/math_fixed.md §E.1): "expect μ̃ bias growing with `|b_t−b_m|`." **Observed**
+(`figures/phase4_stress1_assumption1_*.png`): bias is negative throughout (μ̃ underestimates μ)
+but its MAGNITUDE SHRINKS as `|b_t−β|` grows: `-0.303, -0.295, -0.127` at drift `0.10, 0.20, 0.30`
+— the opposite of the qualitative prediction. Not treated as a bug (the estimator, trained under
+the true DGP, still moves in the expected direction — underestimation from a mismatched
+selection model — and this specific perturbation also grows the shared intercept `a_t` alongside
+`b_t`, since `a_t` here is reused from the original closed form rather than held fixed;
+that coupling is a specific, disclosed modelling choice for this stress test, not part of
+docs/math_fixed.md's own construction), but reported exactly as observed per the Honesty Oath
+rather than smoothed into agreement with the predicted direction.
+
+**Stress 2 — support shift** (`m_t`+2σ, t>m only). Math predicts (§E.2): report the fraction of
+t>m survey values outside the training range. **Observed**
+(`figures/phase4_stress2_support_shift_*.png`): `4.0%, 6.7%, 11.5%` of survey values fall outside
+`[Y.min(), Y.max()]` of the t≤m training pool at t=7,8,9 (7.4% pooled across all of t>m) —
+growing with t as expected (the shift compounds with the years already being further from the
+anchor year m). Bias stayed small (`+0.057, +0.040, +0.055`) despite this: unlike the pre-CP3 unbounded
+run's tail blowup (θ̃→380 at y=−6), the `theta_bounded=20` head (CP3) keeps θ̃'s extrapolation
+gentle past the training range instead of exploding, which plausibly explains why this
+particular stress test doesn't hurt μ̃ much even with ~10% of the mass extrapolated.
+
+**Stress 3 — small n** (`n∈{200,500,2000}`, θ̃ fixed, 10 seeds each — see notes/decisions.md CP4
+for why θ̃ is held fixed here). Math predicts (§E.3): sd of μ̃ over 10 seeds `∝ 1/√n_eff`.
+**Observed** (`figures/phase4_stress3_small_n_*.png`): `sd(μ̃) = 0.0583, 0.0468, 0.0186` at
+`n=200,500,2000` (`mean n_eff = 190.0, 472.9, 1787.2`), tracking the plotted `1/√n` reference
+line closely (slightly above it at n=200,500, touching it at n=2000) — consistent with the
+predicted scaling, within the noise expected from only 10 replicates per n.
