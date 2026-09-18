@@ -39,7 +39,8 @@ def _build_slides(d: dict) -> list[dict]:
     s1, s2, s3 = d["slide1"], d["slide2"], d["slide3"]
 
     slide1_bullets = [
-        f"P_t on (Y x {{0,1}}); pi_t(y) := P[R=1|Y=y] = c_t * Phi(beta*y); P_t,Y = N(m_t, sigma^2)",
+        f"Sample space: (Y x {{0,1}}, B(Y) (x) 2^{{0,1}}); pi_t(y) := P[R=1|Y=y] = c_t * Phi(beta*y); "
+        f"P_t,Y = N(m_t, sigma^2)",
         f"S_t = Law(Y|R=1), density s_t = pi_t*p_t / rho_bar_t",
         f"m={s1['m']}, M={s1['M']}, n={s1['n']}, sigma={s1['sigma']}, beta={s1['beta']}, "
         f"m_t={s1['m_t_intercept']}+{s1['m_t_slope']}t, c_t={s1['c_t_intercept']}{s1['c_t_slope']}t",
@@ -47,9 +48,13 @@ def _build_slides(d: dict) -> list[dict]:
         f"rho_bar_t = c_t*Phi(a_t) varies with t but cancels out of S_t",
         f"Sampler: Y~N(m_t,sigma^2), R~Bern(c_t*Phi(beta*Y)), keep Y with R=1 "
         f"-- rejection sampling IS conditioning on R=1",
+        f"Definition: a_t := beta*m_t / sqrt(1+beta^2 sigma^2); at t=m, a_m={s1['a_m']:.4f} (live)",
         f"theta*(y) = log Phi(a_m) - log Phi(beta*y); alpha*(t) = log Phi(a_t) - log Phi(a_m)",
+        f"Closed form: E_St[Y] = m_t + beta*sigma^2*phi(a_t) / (sqrt(1+beta^2 sigma^2)*Phi(a_t)); "
+        f"measured survey bias E_St[Y]-m_t = {s1['survey_bias_t1']:+.4f} at t=1, "
+        f"{s1['survey_bias_tM']:+.4f} at t={s1['M']}",
         f"Design rule (R3): beta*sigma < 1/sqrt(2) (={1/math.sqrt(2):.4f}); "
-        f"tail index a = 1+1/(beta^2 sigma^2) = {s1['tail_index_a']:.2f} "
+        f"tail index kappa = 1+1/(beta^2 sigma^2) = {s1['tail_index_kappa']:.2f} "
         f"(R3 holds: {s1['r3_holds']})",
     ]
     slide1_caption = (
@@ -58,6 +63,9 @@ def _build_slides(d: dict) -> list[dict]:
     )
 
     foc_str = ", ".join(f"t={t}:{v:.3f}" for t, v in sorted(s2["foc"].items(), key=lambda kv: int(kv[0])))
+    r_hat_str = ", ".join(
+        f"k={k}:{v:+.4f}" for k, v in sorted(s2["r_hat_unbounded"].items(), key=lambda kv: int(kv[0]))
+    )
     slide2_bullets = [
         f"Pooled F over rows (t,z,y), 2mn={s2['rows_total']} rows; "
         f"L=mean((1-z)*exp(r)-z*r), r=theta(y)+alpha[t]",
@@ -67,29 +75,50 @@ def _build_slides(d: dict) -> list[dict]:
         f"Implementation: theta=MLP(1->H->1,ReLU,H={s2['H']}); alpha=free vector in R^(m-1) "
         f"concat with a constant 0; float64; Adam lr={s2['lr']}, wd={s2['wd']} (network only), "
         f"batch={s2['batch']}; stratified 80/20 split; early stopping on validation risk",
-        f"Early stopping is REQUIRED, not cosmetic: R_hat_n is unbounded below for an "
-        f"interpolating theta. Measured: best val loss {s2['best_val_loss']:.4f} at epoch "
+        f"Early stopping is REQUIRED, not cosmetic: the piecewise-linear theta_k (+k at population "
+        f"rows, -k at survey rows) gives R_hat_n(k)=(1/2)(e^-k-k) -> -inf as k->inf. Measured "
+        f"[{r_hat_str}] vs the trained best val loss {s2['best_val_loss']:.4f} at epoch "
         f"{s2['best_epoch']} of {s2['epochs']} run -- the best checkpoint is NOT the last epoch",
         f"Verification: {s2['pytest_summary']}. T4 torch-vs-numpy: "
         f"loss diff {s2['t4']['L_diff']:.1e}, worst grad diff {s2['t4']['worst_grad_diff']:.1e}; "
         f"T7 parametric recovery a_hat={s2['t7_a_hat']:.4f}; "
-        f"T11 weight tails a={s2['t11_a']:.2f}, n_eff CV={s2['t11_n_eff_cv']:.3f}, "
+        f"T11 weight tails kappa={s2['t11_kappa']:.2f}, n_eff CV={s2['t11_n_eff_cv']:.3f}, "
         f"SE ratio={s2['t11_se_ratio']:.2f}",
         f"Diagnostics before any mu~ is reported: FOC mean_i e^(theta~+alpha~(t)) per year "
         f"[{foc_str}]; theta~ vs theta* grid; n_eff",
     ]
 
     table_rows = s3["table"]
-    table_lines = [f"{'t':>2} {'mu(t)':>7} {'survey':>7} {'mu~(t)+-SE':>14} {'offset':>7} {'oracle':>7} {'n_eff/n':>8}"]
+    table_lines = [
+        f"{'t':>2} {'mu(t)':>7} {'survey':>7} {'mu~(t)+-SE':>14} {'offset':>7} {'oracle':>7} "
+        f"{'n_eff/n':>8} {'bias cut':>8}"
+    ]
     for r in table_rows:
         table_lines.append(
             f"{r['t']:>2} {r['mu_true']:>7.3f} {r['survey_mean']:>7.3f} "
-            f"{r['mu_tilde']:>7.3f}+-{r['se']:.3f} {r['offset']:>7.3f} {r['oracle']:>7.3f} {r['n_eff_over_n']:>8.2f}"
+            f"{r['mu_tilde']:>7.3f}+-{r['se']:.3f} {r['offset']:>7.3f} {r['oracle']:>7.3f} "
+            f"{r['n_eff_over_n']:>8.2f} {100*r['bias_reduction_pct']:>7.0f}%"
         )
 
     l2b, l2h = s3["learning2"]["beta06"], s3["learning2"]["beta15"]
     l3 = s3["learning3"]
     tb = l3["theta_star_bounds"]
+    cf = l3["counterfactual"]
+    cf_full, cf_c2, cf_c3 = cf["full"], cf["2"], cf["3"]
+    cs = l3["covariate_shift"]
+    cs2, cs3, cs4 = cs["2"], cs["3"], cs["4"]
+
+    row_last = table_rows[-1]  # t = M
+    drift_share_last = row_last["mu_tilde_minus_oracle"] / row_last["mu_tilde_minus_mu"]
+    sig_ts = ", ".join(str(r["t"]) for r in table_rows if abs(r["mu_tilde_minus_mu_in_se"]) >= 2)
+    decomp_str = "; ".join(
+        f"t={r['t']}: {r['mu_tilde_minus_mu']:+.4f}={r['oracle_minus_mu']:+.4f}+{r['mu_tilde_minus_oracle']:+.4f}"
+        f" ({r['mu_tilde_minus_mu_in_se']:+.1f} SE)"
+        for r in table_rows
+    )
+    headline_str = ", ".join(f"t={r['t']}:{100*r['bias_reduction_pct']:.0f}%" for r in table_rows)
+    band_23_s9 = cs2["s9"] - cs3["s9"]
+    mo_seq = ", ".join(f"{r['mu_tilde_minus_oracle']:+.4f}" for r in table_rows)
 
     slide3_bullets = [
         "\n".join(table_lines),
@@ -97,23 +126,39 @@ def _build_slides(d: dict) -> list[dict]:
         f"mu~=E_St[e^theta Y]/E_St[e^theta] -- lagged population data teaches theta's SHAPE only, "
         f"never the current-year level, which is exactly what makes t>m possible",
         f"Learning 2: the weight tail index decides whether ANY of the inference is valid. "
-        f"E_St[w^k]<inf iff k<a=1+1/(beta^2 sigma^2). Old beta=1.5: a={l2h['a']:.2f}, n_eff/n "
-        f"CV={l2h['cv']:.3f} across seeds, delta-SE {l2h['se_ratio']:.2f}x the true sampling sd, "
-        f"bias decay ~n^-{sum(l2h['decay_exponents']) / len(l2h['decay_exponents']):.2f} "
+        f"E_St[w^k]<inf iff k<kappa=1+1/(beta^2 sigma^2). Old beta=1.5: kappa={l2h['kappa']:.2f}, "
+        f"n_eff/n CV={l2h['cv']:.3f} across seeds, delta-SE {l2h['se_ratio']:.2f}x the true "
+        f"sampling sd, bias decay ~n^-{sum(l2h['decay_exponents']) / len(l2h['decay_exponents']):.2f} "
         f"(predicted n^-{l2h['predicted_exponent']:.2f}) instead of n^-1, T7 a_hat={l2h['t7_a_hat']:.4f} "
-        f"(fails |a-1|<0.02). beta={s1['beta']}: a={l2b['a']:.2f}, CV={l2b['cv']:.3f}, "
+        f"(fails |a-1|<0.02). beta={s1['beta']}: kappa={l2b['kappa']:.2f}, CV={l2b['cv']:.3f}, "
         f"SE ratio={l2b['se_ratio']:.2f}, T7 a_hat={l2b['t7_a_hat']:.4f} (passes). One defect, not four",
-        f"Learning 3: what remains is approximation error, not sampling error. n_eff/n is "
-        f"{min(r['n_eff_over_n'] for r in table_rows):.2f}-{max(r['n_eff_over_n'] for r in table_rows):.2f}, "
-        f"but theta~ drifts below theta* in the right tail, where "
-        f"{100*l3['mass_shares_above']['3']:.1f}% of S_{s1['M']}'s mass sits (y>3), and that drift "
-        f"alone accounts for the mu~({s1['M']}) undershoot (implied shift "
-        f"{l3['implied_shift_mean']:+.4f} vs actual {l3['actual_shift_mean']:+.4f}, "
-        f"{l3['n_reps']} reps of n={l3['n_per_rep']}). theta* is strictly decreasing, convex, "
-        f"bounded below by log Phi(a_m)={tb['log_phi_am']:.3f}; the current bounded head "
-        f"B={l3['theta_bounded']:.0f} never binds (theta* in [{tb['at_train_hi']:.2f}, "
-        f"{tb['at_train_lo']:.2f}] over the training range) -- identified and quantified, "
-        f"not yet applied",
+        f"Learning 3 (headline): mu~ cuts the survey's bias vs mu(t) by {headline_str} -- "
+        f"decomposition mu~-mu=(oracle-mu)+(mu~-oracle): {decomp_str}; only t={sig_ts} exceeds "
+        f"2 SE -- sampling variability, not model error, explains most of the other gaps",
+        f"Learning 3 (mechanism, not circular): hold theta~'s drift delta(y):=theta~(y)-theta*(y) "
+        f"FLAT beyond a cutoff c (delta(min(y,c))), paired on the same S_{s1['M']} draws -- an "
+        f"ablation of the trained net's own output, not a re-interpolation of it. Full drift shift "
+        f"{cf_full['mean']:+.4f} (sd {cf_full['sd']:.4f}); flat beyond y=3 -> {cf_c3['mean']:+.4f} "
+        f"(y>3 contributes {100*cf_c3['contribution_pct']:.0f}%); flat beyond y=2 -> "
+        f"{cf_c2['mean']:+.4f} (y>2 contributes {100*cf_c2['contribution_pct']:.0f}%) -- at "
+        f"t={s1['M']}, {row_last['mu_tilde_minus_oracle']:+.4f} of the "
+        f"{row_last['mu_tilde_minus_mu']:+.4f} total gap ({100*drift_share_last:.0f}%) is this "
+        f"model-drift term, the rest is sampling",
+        f"Learning 3 (diagnosis): the far tail y>3 is {cs3['s9']:.1%} of S_{s1['M']}'s mass but "
+        f"contributes only {100*cf_c3['contribution_pct']:.0f}% of the shift; the 2<y<=3 band "
+        f"({band_23_s9:.1%} of mass) dominates -- that band is data-RICH at t={s1['M']} but "
+        f"data-POOR in training: survey mass share above y=2/3/4, pooled t<=m vs S_{s1['M']}: "
+        f"{cs2['train_tm']:.1%} vs {cs2['s9']:.1%} ({cs2['ratio']:.1f}x), "
+        f"{cs3['train_tm']:.1%} vs {cs3['s9']:.1%} ({cs3['ratio']:.1f}x), "
+        f"{cs4['train_tm']:.1%} vs {cs4['s9']:.1%} ({cs4['ratio']:.1f}x) -- TEMPORAL COVARIATE "
+        f"SHIFT, not extrapolation. mu~-oracle grows monotonically with t ({mo_seq}) -- a "
+        f"structural property of this data-fusion setting, not an implementation bug",
+        f"theta* is strictly decreasing, convex, bounded below by log Phi(a_m)={tb['log_phi_am']:.3f}; "
+        f"the bounded head B={l3['theta_bounded']:.0f} never binds (theta* in "
+        f"[{tb['at_train_hi']:.2f}, {tb['at_train_lo']:.2f}] over the training range) -- "
+        f"identified, not yet applied. Sharper fix from the covariate-shift diagnosis: "
+        f"weight/augment training years toward the forecast years' y-region, or constrain theta~ "
+        f"to be monotone+convex (matching theta*'s known shape) instead of an unconstrained MLP",
     ]
 
     return [
@@ -122,7 +167,7 @@ def _build_slides(d: dict) -> list[dict]:
         {"title": "Solving the optimization problem", "bullets": slide2_bullets,
          "caption": None, "figure": s2["figure_val_curve"]},
         {"title": "Results and learnings", "bullets": slide3_bullets,
-         "caption": None, "figure": s3["figure"]},
+         "caption": None, "figure": s3["figure"], "font_size": 9},
     ]
 
 
@@ -140,13 +185,14 @@ def build_pptx(path: str, slides_spec: list[dict]) -> None:
         title_box.text_frame.paragraphs[0].font.size = Pt(28)
         title_box.text_frame.paragraphs[0].font.bold = True
 
+        font_size = spec.get("font_size", 11)
         body_box = slide.shapes.add_textbox(Inches(0.4), Inches(0.95), Inches(6.4), Inches(6.1))
         tf = body_box.text_frame
         tf.word_wrap = True
         for i, bullet in enumerate(spec["bullets"]):
             p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
             p.text = f"- {bullet}"
-            p.font.size = Pt(11)
+            p.font.size = Pt(font_size)
 
         fig_path = os.path.join(FIGURES_DIR, spec["figure"])
         pic = slide.shapes.add_picture(fig_path, Inches(7.0), Inches(0.95), width=Inches(6.0))

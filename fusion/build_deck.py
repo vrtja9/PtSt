@@ -20,6 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import json
+import math
 import subprocess
 import time
 
@@ -35,7 +36,7 @@ from fusion.estimate import mu_tilde, oracle_estimate, survey_mean_baseline, off
 from fusion.evaluate import stress_test_violate_r3
 from fusion.loss import fusion_loss
 from fusion.model import AlphaTable, ThetaNet, ratio_model
-from fusion.train import foc_diagnostic, theta_grid_data, train
+from fusion.train import foc_diagnostic, train
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SLIDES_DIR = REPO_ROOT / "slides"
@@ -113,7 +114,7 @@ def _t4_agreement() -> dict:
 def _t11_at(cfg: Config, n_boot: int = 200) -> dict:
     """T11(a)-(c)'s numbers (oracle theta*, no training) at an arbitrary cfg -- used for both the
     current default and, via a heavy-tailed cfg, the old beta=1.5 contrast (slide 3 learning 2)."""
-    a_tail = 1 + 1 / (cfg.beta ** 2 * cfg.sigma ** 2)
+    kappa = 1 + 1 / (cfg.beta ** 2 * cfg.sigma ** 2)
     fracs = []
     for s in range(10):
         y = dgp.draw_survey(cfg, np.random.default_rng(100 + s), 1, cfg.n)
@@ -129,7 +130,7 @@ def _t11_at(cfg: Config, n_boot: int = 200) -> dict:
     delta_se = float(np.sqrt((w0 ** 2 * (y0 - mh0) ** 2).sum()) / w0.sum())
     reps = np.array([oracle_estimate(cfg, dgp.draw_survey(cfg, rng, 1, cfg.n)) for _ in range(n_boot)])
     se_ratio = delta_se / float(reps.std())
-    return {"a": a_tail, "n_eff_cv": cv, "delta_se": delta_se, "mc_sd": float(reps.std()), "se_ratio": se_ratio}
+    return {"kappa": kappa, "n_eff_cv": cv, "delta_se": delta_se, "mc_sd": float(reps.std()), "se_ratio": se_ratio}
 
 
 def collect() -> dict:
@@ -137,15 +138,17 @@ def collect() -> dict:
     data: dict = {"config": json.loads(cfg.to_json())}
 
     # ---------------- Slide 1: DGP ----------------
-    a_tail = 1 + 1 / (cfg.beta ** 2 * cfg.sigma ** 2)
+    kappa_tail = 1 + 1 / (cfg.beta ** 2 * cfg.sigma ** 2)
     r3_holds = bool(cfg.beta * cfg.sigma < 1 / np.sqrt(2))
     bias_t1 = float(dgp.ES_closed(cfg, 1) - dgp.m_t(cfg, 1))
     bias_tM = float(dgp.ES_closed(cfg, cfg.M) - dgp.m_t(cfg, cfg.M))
+    a_m_scalar = float(dgp.a_t(cfg, cfg.m))
     data["slide1"] = {
         "m": cfg.m, "M": cfg.M, "n": cfg.n, "sigma": cfg.sigma, "beta": cfg.beta,
         "m_t_intercept": cfg.m_t_intercept, "m_t_slope": cfg.m_t_slope,
         "c_t_intercept": cfg.c_t_intercept, "c_t_slope": cfg.c_t_slope,
-        "tail_index_a": a_tail, "r3_holds": r3_holds,
+        "tail_index_kappa": kappa_tail, "r3_holds": r3_holds,
+        "a_m": a_m_scalar,
         "survey_bias_t1": bias_t1, "survey_bias_tM": bias_tM,
         "figure": "phase1a_densities_96169d0c.png",
     }
@@ -178,7 +181,7 @@ def collect() -> dict:
         "H": cfg.H, "lr": cfg.lr, "wd": cfg.wd, "batch": cfg.batch, "epochs": cfg.epochs,
         "best_val_loss": result.best_val_loss, "best_epoch": result.best_epoch,
         "foc": {str(k): v for k, v in foc.items()},
-        "t4": t4, "t7_a_hat": t7_a_hat, "t11_a": t11_default["a"],
+        "t4": t4, "t7_a_hat": t7_a_hat, "t11_kappa": t11_default["kappa"],
         "t11_n_eff_cv": t11_default["n_eff_cv"], "t11_se_ratio": t11_default["se_ratio"],
         "pytest_summary": pytest_summary, "pytest_runtime_s": pytest_runtime,
         "figure_val_curve": "phase3_val_curve_96169d0c.png",
@@ -194,11 +197,21 @@ def collect() -> dict:
         survey_mean_t = survey_mean_baseline(y_t)
         est, n_eff_frac = mu_tilde(result.theta_net, result.standardizer, y_t)
         se = bootstrap_se(result.theta_net, result.standardizer, y_t, n_boot=200, rng=rng)
+        oracle_t = oracle_estimate(cfg, y_t)
+        mu_true_t = float(dgp.mu_true(cfg, t))
+        # S3(a): decomposition mu~-mu = (oracle-mu) + (mu~-oracle); S3(d): headline bias reduction
+        oracle_minus_mu = oracle_t - mu_true_t
+        mu_tilde_minus_oracle = est - oracle_t
+        mu_tilde_minus_mu = est - mu_true_t
+        survey_minus_mu = survey_mean_t - mu_true_t
         table.append({
-            "t": t, "mu_true": float(dgp.mu_true(cfg, t)), "survey_mean": survey_mean_t,
+            "t": t, "mu_true": mu_true_t, "survey_mean": survey_mean_t,
             "mu_tilde": est, "se": se, "n_eff_over_n": n_eff_frac,
             "offset": offset_baseline(mu_m_true, survey_mean_m, survey_mean_t),
-            "oracle": oracle_estimate(cfg, y_t),
+            "oracle": oracle_t,
+            "oracle_minus_mu": oracle_minus_mu, "mu_tilde_minus_oracle": mu_tilde_minus_oracle,
+            "mu_tilde_minus_mu": mu_tilde_minus_mu, "mu_tilde_minus_mu_in_se": mu_tilde_minus_mu / se,
+            "bias_reduction_pct": 1 - abs(mu_tilde_minus_mu) / abs(survey_minus_mu),
         })
 
     # Learning 2: beta=1.5 contrast (live, via the heavy-tail opt-in)
@@ -207,25 +220,67 @@ def collect() -> dict:
     r3_stress = stress_test_violate_r3(cfg)  # same numbers as _t11_at(heavy) plus decay exponents
     t7_a_hat_heavy = _t7_a_hat(Config(n=200_000, beta=1.5, allow_heavy_tails=True))
 
-    # Learning 3: residual right-tail error (C4(a) verification, live)
-    grid = theta_grid_data(cfg, result.theta_net, result.standardizer, npts=400)
-    grid_y, drift = grid["y"], (grid["theta_hat"] - grid["theta_star"])
-    y_big = dgp.draw_survey(cfg, rng, cfg.M, 100_000)
-    mass_shares = {str(k): float(np.mean(y_big > k)) for k in (3, 4, 5)}
+    # S2: R_hat_n = (1/2)(e^{-k}-k), the unbounded-below piecewise-linear-theta construction
+    # (Step 9, docs/math_fixed.md SS B) -- pure closed form, no randomness.
+    r_hat_unbounded = {str(k): 0.5 * (math.exp(-k) - k) for k in (0, 1, 2, 4, 8)}
 
-    n_rep_draw, n_reps_implied = 200, 300
-    rng_imp = np.random.default_rng(999)
-    implied = np.empty(n_reps_implied)
-    actual = np.empty(n_reps_implied)
-    for i in range(n_reps_implied):
-        y9 = dgp.draw_survey(cfg, rng_imp, cfg.M, n_rep_draw)
-        theta_star_y = dgp.theta_star(cfg, y9)
-        d_interp = np.interp(y9, grid_y, drift)
-        w_oracle = np.exp(theta_star_y)
-        w_interp = np.exp(theta_star_y + d_interp)
-        implied[i] = (w_interp * y9).sum() / w_interp.sum() - (w_oracle * y9).sum() / w_oracle.sum()
-        est_i, _ = mu_tilde(result.theta_net, result.standardizer, y9)
-        actual[i] = est_i - oracle_estimate(cfg, y9)
+    # S3(b): counterfactual repair -- hold the drift delta(y):=thetaB(y)-theta*(y) FLAT beyond a
+    # cutoff c (delta(min(y,c))) and measure how much of the mu~(9)-oracle(9) shift disappears.
+    # Paired on the SAME survey draws across "full" and both cutoffs -- NOT the same computation
+    # as interpolating the grid back onto itself (which only verifies interpolation accuracy,
+    # per the circularity this replaces); here "full" evaluates the actual net directly, and each
+    # cutoff evaluates the actual net at a CLIPPED input, a genuine ablation.
+    n_cf_draw, n_cf_reps = 2000, 200
+    rng_cf = np.random.default_rng(4242)
+    full_shifts = np.empty(n_cf_reps)
+    repaired_shifts = {2: np.empty(n_cf_reps), 3: np.empty(n_cf_reps)}
+
+    def _theta_net_at(y_raw: np.ndarray) -> np.ndarray:
+        ys = result.standardizer.transform(y_raw)
+        with torch.no_grad():
+            return result.theta_net(torch.as_tensor(ys)).numpy()
+
+    for i in range(n_cf_reps):
+        y9 = dgp.draw_survey(cfg, rng_cf, cfg.M, n_cf_draw)
+        oracle_cf = oracle_estimate(cfg, y9)
+        w_full = np.exp(_theta_net_at(y9))
+        mu_full = (w_full * y9).sum() / w_full.sum()
+        full_shifts[i] = mu_full - oracle_cf
+        for c in (2, 3):
+            y_clipped = np.minimum(y9, c)
+            delta_clipped = _theta_net_at(y_clipped) - dgp.theta_star(cfg, y_clipped)
+            theta_repaired = dgp.theta_star(cfg, y9) + delta_clipped
+            w_repaired = np.exp(theta_repaired)
+            mu_repaired = (w_repaired * y9).sum() / w_repaired.sum()
+            repaired_shifts[c][i] = mu_repaired - oracle_cf
+
+    mean_full_shift = float(full_shifts.mean())
+    sd_full_shift = float(full_shifts.std(ddof=1))
+    counterfactual = {"full": {"mean": mean_full_shift, "sd": sd_full_shift}}
+    for c in (2, 3):
+        rs = repaired_shifts[c]
+        mean_repaired = float(rs.mean())
+        counterfactual[str(c)] = {
+            "mean": mean_repaired, "sd": float(rs.std(ddof=1)),
+            "contribution_pct": (mean_full_shift - mean_repaired) / mean_full_shift,
+        }
+
+    # S3(c): covariate shift -- share of SURVEY mass above y=2,3,4 for the pooled t<=m years
+    # (what the model was trained on) vs S_9 (what it's asked to extrapolate to).
+    n_cov = 200_000
+    rng_cov = np.random.default_rng(31415)
+    pooled_train_y = np.concatenate(
+        [dgp.draw_survey(cfg, rng_cov, t, n_cov // cfg.m) for t in range(1, cfg.m + 1)]
+    )
+    s9_y_cov = dgp.draw_survey(cfg, rng_cov, cfg.M, n_cov)
+    covariate_shift = {}
+    for thresh in (2, 3,4):
+        p_train = float(np.mean(pooled_train_y > thresh))
+        p_s9 = float(np.mean(s9_y_cov > thresh))
+        covariate_shift[str(thresh)] = {
+            "train_tm": p_train, "s9": p_s9,
+            "ratio": (p_s9 / p_train) if p_train > 0 else None,
+        }
 
     am = dgp.a_t(cfg, cfg.m)
     train_lo, train_hi = float(Y.min()), float(Y.max())
@@ -237,23 +292,20 @@ def collect() -> dict:
         "train_lo": train_lo, "train_hi": train_hi,
     }
 
+    data["slide2"]["r_hat_unbounded"] = r_hat_unbounded
     data["slide3"] = {
         "table": table,
         "learning2": {
-            "beta06": {"a": t11_default["a"], "cv": t11_default["n_eff_cv"], "se_ratio": t11_default["se_ratio"],
+            "beta06": {"kappa": t11_default["kappa"], "cv": t11_default["n_eff_cv"], "se_ratio": t11_default["se_ratio"],
                        "t7_a_hat": t7_a_hat},
-            "beta15": {"a": t11_heavy["a"], "cv": t11_heavy["n_eff_cv"], "se_ratio": t11_heavy["se_ratio"],
+            "beta15": {"kappa": t11_heavy["kappa"], "cv": t11_heavy["n_eff_cv"], "se_ratio": t11_heavy["se_ratio"],
                        "t7_a_hat": t7_a_hat_heavy, "decay_exponents": r3_stress["exponents"],
                        "predicted_exponent": r3_stress["predicted_exponent"]},
         },
         "learning3": {
-            "mass_shares_above": mass_shares,
-            "implied_shift_mean": float(implied.mean()), "implied_shift_sd": float(implied.std(ddof=1)),
-            "actual_shift_mean": float(actual.mean()), "actual_shift_sd": float(actual.std(ddof=1)),
-            "n_reps": n_reps_implied, "n_per_rep": n_rep_draw,
+            "counterfactual": counterfactual,
+            "covariate_shift": covariate_shift,
             "theta_star_bounds": theta_star_bounds, "theta_bounded": cfg.theta_bounded,
-            "grid_y_sample": [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7],
-            "drift_at_y_sample": [float(np.interp(yy, grid_y, drift)) for yy in (-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7)],
         },
         "figure": "phase4_main_figure_96169d0c.png",
     }

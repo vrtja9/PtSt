@@ -36,10 +36,10 @@ def hajek(y):                      # self-normalized estimator (Step 9, Definiti
     w = w_of(y); return (w * y).sum() / w.sum()
 
 print("== A. E_S[w^k] integrals vs integration range (divergence = infinite moment) ==")
-print("   (legend: a>2 -> finite variance (k=2); a>3 -> finite 3rd moment (k=3); L=10,20,40 is the integration range)")
+print("   (legend: kappa>2 -> finite variance (k=2); kappa>3 -> finite 3rd moment (k=3); L=10,20,40 is the integration range)")
 for beta in (0.6, 0.8, 1.0, 1.5):
     F.CFG['beta'] = beta
-    a = 1 + 1 / (beta ** 2 * SIGMA ** 2)
+    kappa = 1 + 1 / (beta ** 2 * SIGMA ** 2)
     out = []
     for k in (2, 3):
         vals = []
@@ -47,14 +47,14 @@ for beta in (0.6, 0.8, 1.0, 1.5):
             f = lambda y: norm.pdf(y, F.m_t(T1), SIGMA) / max(norm.cdf(beta * y), 1e-300) ** (k - 1)
             vals.append(quad(f, -L, 10, limit=400)[0])
         out.append("k=%d: %s" % (k, ["%.3g" % v for v in vals]))
-    print("  beta=%.1f  tail index a=%5.2f  %s" % (beta, a, "   ".join(out)))
+    print("  beta=%.1f  tail index kappa=%5.2f  %s" % (beta, kappa, "   ".join(out)))
 
 print("== B. predicted vs observed O(1/n) bias of mu~ at t=1 (oracle theta*) ==")
 for beta in (0.6, 1.5):
     F.CFG['beta'] = beta
-    a = 1 + 1 / (beta ** 2 * SIGMA ** 2); mu = F.m_t(T1)
+    kappa = 1 + 1 / (beta ** 2 * SIGMA ** 2); mu = F.m_t(T1)
     pred_val = None
-    if a > 3:
+    if kappa > 3:
         am, at = F.a_t(F.CFG['m']), F.a_t(T1)
         wf = lambda y: norm.cdf(am) / max(norm.cdf(beta * y), 1e-300)
         sf = lambda y: norm.cdf(beta * y) * norm.pdf(y, mu, SIGMA) / norm.cdf(at)
@@ -65,8 +65,8 @@ for beta in (0.6, 1.5):
         chk = "  [check E_S[w] = e^{-alpha*(1)}: %.4f vs %.4f]" % (
             Ew, np.exp(-(np.log(norm.cdf(at)) - np.log(norm.cdf(am)))))
     else:
-        pred, chk = "not defined (a<=3, third moment infinite)", ""
-    print("  beta=%.1f  a=%.2f  predicted n*bias -> %s%s" % (beta, a, pred, chk))
+        pred, chk = "not defined (kappa<=3, third moment infinite)", ""
+    print("  beta=%.1f  kappa=%.2f  predicted n*bias -> %s%s" % (beta, kappa, pred, chk))
     rng = np.random.default_rng(21)
     n_reps = 10000
     for n in (40, 80, 160, 320):

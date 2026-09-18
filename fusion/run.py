@@ -236,7 +236,7 @@ def phase4_run(cfg: Config):
     ax2.loglog(ns4, ref4, linestyle="--", label=f"n^-{st4['predicted_exponent']:.3f} (SS G prediction)")
     ax2.set_xlabel("n"); ax2.set_ylabel("|bias(n)|"); ax2.legend(fontsize=7)
     ax2.set_title(f"delta-SE/MC-sd ratio={st4['se_ratio']:.2f} (signature: far from 1)", fontsize=9)
-    fig.suptitle(f"Stress 4: violate (R3) on purpose (beta={st4['beta']}, a={st4['a']:.2f})", y=1.04)
+    fig.suptitle(f"Stress 4: violate (R3) on purpose (beta={st4['beta']}, kappa={st4['kappa']:.2f})", y=1.04)
     fig.tight_layout()
     saved.append(_save_with_config(fig, "phase4_stress4_violate_r3", cfg))
     plt.close(fig)
@@ -283,7 +283,7 @@ def main():
         for r in out["st3"]:
             print(f"  n={r['n']}: sd(mu_tilde)={r['sd_mu_tilde']:.4f} mean_n_eff={r['mean_n_eff']:.1f}")
         st4 = out["st4"]
-        print(f"stress 4 (violate R3 on purpose: beta={st4['beta']}, a={st4['a']:.3f}):")
+        print(f"stress 4 (violate R3 on purpose: beta={st4['beta']}, kappa={st4['kappa']:.3f}):")
         print(f"  n_eff/n over 10 seeds: mean={st4['n_eff_mean']:.3f} sd={st4['n_eff_sd']:.3f} "
               f"CV={st4['n_eff_cv']:.3f} (signature: CV>=0.20-ish)")
         print(f"  delta_SE={st4['delta_se']:.4f} MC_sd={st4['mc_sd']:.4f} ratio={st4['se_ratio']:.2f} "

@@ -38,15 +38,21 @@ code file, (iii) the test that verifies it.
     (delta-method SE, finite-sample bias, `1≤n_eff≤n`). Code: `fusion/estimate.mu_tilde` (n_eff),
     `bootstrap_se`. Test: T11(b) (n_eff/n stability), T11(c) (SE calibration), T11(d)
     (finite-sample bias vs the numerically-integrated prediction).
-11. **Rule (R3).** §G's theorem: `E_St[w^k]<∞ ⟺ k<a:=1+1/(β²σ²)`. Code:
+11. **Rule (R3).** §G's theorem: `E_St[w^k]<∞ ⟺ k<κ:=1+1/(β²σ²)`. Code:
     `fusion/config.Config.__post_init__` (raises unless `βσ<1/√2` or `allow_heavy_tails=True`).
-    Test: T11(a) (asserts `βσ<1/√2`, quoting `a`).
-12. **The residual right-tail error.** §H: with (R3) satisfied, n_eff/n is healthy (0.93–0.96 —
-    slide 3's table), so the remaining `μ̃(t>m)` gap is θ̃'s approximation error, concentrated
-    where `S_t` has mass (`y>3`, ~12.6% of `S_9`) but t≤m training data thins out. Code:
-    `fusion/train.theta_grid_data`. Test: none dedicated — this is an observational finding from
-    opening the θ̃ vs θ* figure and re-deriving it numerically (`fusion/build_deck.py`'s
-    interpolated-drift check, C4(a)), not a pass/fail assertion.
+    Test: T11(a) (asserts `βσ<1/√2`, quoting `κ`).
+12. **The residual error after (R3).** §H: with (R3) satisfied, n_eff/n is healthy (0.93–0.96 —
+    slide 3's table), so part of the remaining `μ̃(t>m)` gap is sampling noise and part is θ̃'s
+    approximation error. Decomposing `μ̃(t)−μ(t) = (oracle(t)−μ(t)) + (μ̃(t)−oracle(t))` shows only
+    t=9 clears 2 SE, and even there the model term is 38% of the gap, not all of it. That model
+    term concentrates in the 2<y≤3 band (33.7% of `S_9`'s mass), NOT the far tail y>3 (12.7% of
+    mass, only 38% of the shift) — verified by a counterfactual ablation that holds θ̃'s drift
+    flat beyond a cutoff c, not by re-interpolating θ̃'s own output onto itself (that check was
+    circular and has been removed, §H). That band is data-rich at t=9 but data-poor during
+    training (survey mass share above y=2, pooled t≤m vs `S_9`: 10.0% vs 46.4%, a 4.7× gap) — a
+    TEMPORAL COVARIATE SHIFT, not tail extrapolation. Code: `fusion/build_deck.py`'s
+    counterfactual-repair and covariate-shift blocks. Test: none dedicated — an observational
+    finding from the θ̃ vs θ* figure and the live measurements above, not a pass/fail assertion.
 
 ## Three questions to expect, and the one-sentence answer
 
@@ -55,10 +61,19 @@ code file, (iii) the test that verifies it.
   `(P_t, S_t)` data for `t≤m` pins θ down, via the pooled loss's unique minimizer (Steps 6–7).
 - **"Why β=0.6 and not some other value?"** Because (R3) requires `βσ<1/√2` for the weight's
   third moment — hence the Hájek estimator's `O(1/n)` bias expansion and the delta-method SE —
-  to be finite; β=0.6 gives tail index `a=3.78`, safely above 3, while the original β=1.5 gave
-  `a=1.44` (and, as a byproduct, explained T7's earlier CP2 failure).
+  to be finite; β=0.6 gives tail index `κ=3.78`, safely above 3, while the original β=1.5 gave
+  `κ=1.44` (and, as a byproduct, explained T7's earlier CP2 failure).
 - **"Is this finished, or is there a known issue?"** The sampling-variance side is healthy
-  (`n_eff/n≈0.93–0.96`), but there is one known, quantified residual: θ̃ drifts from θ* in the
-  right tail (`y>3`, ~12.6% of `S_9`'s mass), which fully explains the small `μ̃(9)` undershoot —
-  a targeted fix (a monotone or genuinely-binding constraint on θ) is identified and quantified,
-  not yet applied.
+  (`n_eff/n≈0.93–0.96`), but there is one known, quantified residual: θ̃'s approximation error vs
+  θ* in the 2<y≤3 band, which explains part — not all, see the next question — of the small
+  `μ̃(9)` undershoot; a targeted fix (a monotone/convex constraint on θ̃, or reweighting training
+  years toward the forecast years' y-region) is identified and quantified, not yet applied.
+- **"Why does μ̃ undershoot at t=9?"** Two parts, not one. (i) Sampling: `μ̃(9)−μ(9)=-0.0662` is
+  `2.6` SE from zero — at t=7,8 the same kind of gap is only `0.7` SE, indistinguishable from
+  sampling noise, so t=9's gap is the one that is actually real. (ii) Model: of that `-0.0662`,
+  only `-0.0253` (38%) is θ̃'s approximation error vs θ*, and a counterfactual ablation (holding
+  the drift flat beyond a cutoff, not re-interpolating θ̃ onto itself) shows that error
+  concentrates in the 2<y≤3 band — a region `S_9` visits far more (33.7% of its mass) than the
+  t≤m training years do (their combined mass above y=2 is 10.0% vs `S_9`'s 46.4%, a 4.7× gap):
+  temporal covariate shift, not tail extrapolation. The other 62% (`-0.0409`) is plain sampling
+  variability in a single survey draw.

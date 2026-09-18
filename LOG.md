@@ -270,3 +270,38 @@ exactly where directly comparable.
   `build_deck.collect()` then `render_slides._build_slides()` then both build functions, matching
   the two-script design. Verified via a full re-run (`python -m fusion.run --phase 5`, 78.7s).
 - `python -m pytest -q tests/` (final check after all edits): 14 passed.
+
+## Deck review round 2 -- S1-S4 slide-3 corrections and tail-index rename (2026-09-18)
+- Renamed the weight-moment tail index `a` -> `kappa` throughout code/tests/docs/CLAUDE.md (DGP
+  scalars `a_t`/`a_m` and T7's fitted slope `a_hat` left untouched -- different quantities).
+- `python3 fusion/build_deck.py` (78.0s): saved slides/slide_data.json.
+  slide1: tail_index_kappa=3.7778, r3_holds=true, a_m=0.51450, survey_bias_t1=+0.4535,
+  survey_bias_tM=+0.1677.
+  slide2: best_val_loss=0.4481 at epoch 140/400, r_hat_unbounded={0:+0.5000, 1:-0.3161,
+  2:-0.9323, 4:-1.9908, 8:-3.9998} (closed form (1/2)(e^-k-k), matches hand-derived reference
+  exactly), FOC={1:1.037,2:1.012,3:1.003,4:0.998,5:0.988,6:0.969}, T4 L_diff=5.6e-17/
+  worst_grad_diff=6.9e-17, T7 a_hat=1.0063, T11 kappa=3.778/CV=0.048/SE_ratio=0.99,
+  pytest_summary="14 passed in 40.49s" (subprocess, not hand-typed).
+  slide3 table (t=7,8,9) decomposition mu~-mu=(oracle-mu)+(mu~-oracle): t=7: +0.0153=+0.0250+
+  -0.0097 (+0.7 SE); t=8: -0.0165=+0.0019+-0.0184 (-0.7 SE); t=9: -0.0662=-0.0409+-0.0253
+  (-2.6 SE) -- only t=9 exceeds 2 SE. bias_reduction_pct (1-|mu~-mu|/|survey-mu|): 93%/91%/49%
+  at t=7/8/9.
+  learning2 contrast (beta=0.6 vs live beta=1.5 via allow_heavy_tails=True): kappa=3.78 vs 1.44,
+  CV=0.048 vs 0.790, SE_ratio=0.99 vs 2.49, T7 a_hat=1.0063 (pass) vs 1.0255 (fail).
+  learning3 counterfactual (repair theta~'s drift flat beyond cutoff c, paired on 200 reps of
+  n=2000 S_9 draws, NOT the old circular grid-reinterpolation check which was deleted): full
+  drift shift -0.0286 (sd 0.0018); flat beyond y=3 -> -0.0178 (y>3 contributes 38%); flat beyond
+  y=2 -> -0.0023 (y>2 contributes 92%). learning3 covariate_shift (survey mass share above
+  y=2/3/4, pooled t<=m vs S_9, 200k draws each): 10.0% vs 46.4% (4.7x); 1.2% vs 12.7% (10.3x);
+  0.1% vs 1.5% (22.8x). mu~-oracle sequence (t=7,8,9): -0.0097, -0.0184, -0.0253 -- monotonically
+  growing with t.
+  NOT reproduced: the user's supplied reference numbers for the counterfactual (full drift
+  -0.0375; y>3 contributes 30%; y>2 contributes 76%) -- the user flagged these as from a
+  since-retrained model. This run's numbers show the same qualitative pattern (near-tail band
+  dominates over far tail) but different magnitudes. All other reference numbers (decomposition,
+  bias-reduction %, R_hat_n, covariate-shift ratios) matched closely.
+- `python3 -m fusion.render_slides`: saved slides/deck.pptx, slides/deck.md.
+- Updated docs/math_fixed.md SS H (replaced the circular "Verified in-repo" paragraph with the
+  attribution/counterfactual/covariate-shift findings above) and notes/talk_through.md (items
+  11-12 and the Q&A section, adding a two-part sampling+covariate-shift answer to "why does mu~
+  undershoot at t=9").

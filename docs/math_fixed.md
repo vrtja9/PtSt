@@ -34,29 +34,31 @@ Symbols added here: π_t(y):=P_{P_t}[R=1|Y=y]; ρ̄_t:=P_{P_t}[R=1]; λ dominati
 - Standardisation: θ̃(y) := net((y−mean)/std); no Jacobian anywhere (θ is evaluated pointwise, no density computed).
 - Estimator (Step 4) uses θ only; α is never needed for t>m.
 - Population minimum of the batch-averaged loss on the pooled data = (1/2)(1 − mean_t KL_t); useful sanity number.
-- Delta-method SE of the Hájek estimator (valid when a > 2):
+- Delta-method SE of the Hájek estimator (valid when κ > 2, the weight-moment tail index of §G):
   se_hat = sqrt( Σ_i w_i² (y_i − μ̃)² ) / Σ_i w_i.  Derivation: μ̃ − μ =
   (1/n) Σ_i w_i (y_i − μ) / (1/n) Σ_i w_i; numerator terms are i.i.d. mean zero
   (exactly zero in population when θ̃ = θ* + const), then CLT + Slutsky.
 - Effective sample size n_eff = (Σ_i w_i)² / Σ_i w_i² satisfies 1 ≤ n_eff ≤ n by
   Cauchy-Schwarz, with n_eff = n iff all weights are equal.
-- Finite-sample bias (valid when a > 3): E[μ̃] − μ = −E_S[w² (Y−μ)] / (n E_S[w]²) + o(1/n).
+- Finite-sample bias (valid when κ > 3): E[μ̃] − μ = −E_S[w² (Y−μ)] / (n E_S[w]²) + o(1/n).
 - Centering identity (exact, any constant c): μ̃ − c = Σ_i w_i (y_i − c) / Σ_i w_i.
 
 ## D. Default DGP (the only open choice — confirm at CP1)
 - m=6, M=9, n=2000, σ=1, β=0.6;  m_t = −0.5 + 0.25 t;  c_t = 0.9 − 0.06 t.
-  (β was 1.5 until 2026-09-18; changed under rule (R3), see §G. Tail index a = 3.78.)
+  (β was 1.5 until 2026-09-18; changed under rule (R3), see §G. Tail index κ = 3.78.)
 - P_{t,Y} = N(m_t, σ²);  π_t(y) = c_t Φ(βy)  (Φ standard normal cdf) — Assumption 1 holds because Φ(βy)/Φ(βy') has no t;
   ρ̄_t = c_t Φ(a_t) changes over time (as the challenge asks) but never enters S_t.
 - Survey sampler: draw Y ~ N(m_t,σ²), R ~ Bern(c_t Φ(βY)), keep Y with R=1 until n kept (this IS "conditioning on R=1").
 - Closed forms, a_t := β m_t/√(1+β²σ²):  E_{S_t}[Y] = m_t + βσ² φ(a_t)/(√(1+β²σ²) Φ(a_t));
   θ*(y) = log Φ(a_m) − log Φ(βy);  α*(t) = log Φ(a_t) − log Φ(a_m).
   (E[Φ(βY)] = Φ(a_t) since W−βY ~ N(−βm_t, 1+β²σ²); E[YΦ(βY)] by Stein's lemma E[(Y−m)h(Y)] = σ²E[h'(Y)].)
-- (R3) Weight-moment rule. w = e^{θ*} has E_{S_t}[w^k] < ∞ iff k < a := 1 + 1/(β²σ²).
-  Require βσ < 1/√2 (a > 3: finite third moment, so both the CLT-based SE and the O(1/n) bias
+- (R3) Weight-moment rule. w = e^{θ*} has E_{S_t}[w^k] < ∞ iff k < κ := 1 + 1/(β²σ²) (κ is the
+  weight tail index of §G — distinct from a_t/a_m above, which are the DGP's own closed-form
+  scalars, and from T7's fitted slope â in θ(y)=a·(−logΦ(βy))+b).
+  Require βσ < 1/√2 (κ > 3: finite third moment, so both the CLT-based SE and the O(1/n) bias
   expansion are valid). βσ ∈ [1/√2, 1) is usable but the bias constant is not defined; βσ ≥ 1 has
   infinite weight variance and is a stress test only, never a default. Any change to β, σ or the
-  shape of π_t must restate a and check this rule.
+  shape of π_t must restate κ and check this rule.
 - Survey bias with these numbers shrinks from ≈0.45 (t=1) to ≈0.17 (t=9): visible, and time-varying so the
   last-known-offset baseline fails by design.
 - Alternatives the user may pick instead (each is 1–3 lines to swap): exponential tilt π ∝ e^{βy} on bounded Y
@@ -109,12 +111,22 @@ Symbols added here: π_t(y):=P_{P_t}[R=1|Y=y]; ρ̄_t:=P_{P_t}[R=1]; λ dominati
   ```
 - Grad-check (from `python fusion_numpy.py`, its own CFG: lr=1e-2, wd=1e-4, epochs=150, beta=0.6):
   worst relative error 9.03e-9.
+- **Which lr belongs to which model (2026-09-18, S2 clarification):** the `lr=0.003` above is
+  `tools/twin_default_run.py`'s explicit override of the NUMPY TWIN's own hyperparameters, chosen
+  to match "the settings that gave FOC 0.98–1.03 in the twin" per the original kickoff prompt —
+  it is a reference/sanity-check script, not the pipeline slides/results are built from.
+  `fusion/config.py`'s `Config.lr=0.001` is the actual TORCH PIPELINE's default (CP3-adopted,
+  notes/decisions.md), used for every Phase 3–5 result, figure and slide in this repo. Both are
+  intentional and both are correct for their own purpose; they are not the same run and should
+  never be quoted interchangeably.
 
 ## G. Weight-moment theorem (R3) — why β must satisfy βσ < 1/√2
 
 **Theorem (weight moments).** For k ≥ 1,
-E_{S_t}[w^k] < ∞  ⟺  (k−1)β²σ² < 1,  i.e.  k < 1 + 1/(β²σ²) =: a,
-(boundary case aside), where a is the tail index: P_{S_t}(w > x) ~ x^{−a}.
+E_{S_t}[w^k] < ∞  ⟺  (k−1)β²σ² < 1,  i.e.  k < 1 + 1/(β²σ²) =: κ,
+(boundary case aside), where κ is the tail index: P_{S_t}(w > x) ~ x^{−κ}. (κ is distinct from
+the DGP scalars a_t, a_m of §D, and from T7's fitted slope â — three unrelated quantities that
+happened to share the letter "a" before this rename.)
 
 **Proof sketch.** By change of measure, E_{S_t}[w^k] = const · E_{P_{t,Y}}[ρ_t^{k−1}]
 = const · ∫ φ_{m_t,σ}(y) Φ(βy)^{−(k−1)} dy. By Mills' ratio (Gordon's inequality),
@@ -129,15 +141,15 @@ y²((k−1)β²/2 − 1/(2σ²)) + O(y), integrable at −∞ iff (k−1)β²σ�
   bias expansion of the Hájek (self-normalized) estimator; if it fails, the bias decays slower
   than 1/n and n_eff jumps erratically between samples.
 
-The old default β=1.5, σ=1 gave a = 1.444: neither the variance nor the third moment exists.
+The old default β=1.5, σ=1 gave κ = 1.444: neither the variance nor the third moment exists.
 That was the defect (see notes/decisions.md, 2026-09-18). New design rule (R3): require
-βσ < 1/√2; default β=0.6 (a = 3.78). βσ ≥ 1 is a legitimate stress test, never a default.
+βσ < 1/√2; default β=0.6 (κ = 3.78). βσ ≥ 1 is a legitimate stress test, never a default.
 
 **Diagnostic signature of a violated (R3):** n_eff/n swings by an order of magnitude between
 data seeds; the delta-method SE and the Monte-Carlo sd of μ̃ disagree by more than ~30%; n·(bias)
 grows with n instead of settling; sd·√n grows with n instead of being flat. The FOC diagnostic
 and α̃(t) are sample means of w, so under infinite variance they converge at the stable-law rate
-n^{−(1−1/a)} rather than n^{−1/2} and look noisy even when the code is correct.
+n^{−(1−1/κ)} rather than n^{−1/2} and look noisy even when the code is correct.
 
 Evidence: `tools/check_weight_tails.py` (LOG.md "beta correction" entry has the full stdout).
 
@@ -148,14 +160,43 @@ term of the estimator's error is healthy. The residual gap between μ̃(t) and t
 is instead the APPROXIMATION term of the error decomposition — θ̃ vs θ* itself — concentrated
 where S_t has mass but the t≤m training data thins out.
 
-**Verified in-repo (2026-09-18).** Interpolating the θ̃−θ* grid (`fusion.train.theta_grid_data`)
-onto S_9 draws and using it in place of θ̃ reproduces the actual μ̃(9)−oracle(9) gap essentially
-exactly: implied shift = `-0.0286` (paired at the same seeds against the actual trained-model gap:
-also `-0.0286`, sd `0.0055` over 500 reps of n=200); at n=2000 (Phase 3's own table) the actual
-single-draw gap is `-0.0273`. So the θ̃-vs-θ* drift alone fully accounts for the μ̃(9) undershoot —
-there is no separate, unexplained error term. S_9's mass above y=3,4,5 is `0.1273, 0.0147, 0.0008`
-— the right tail (y>3, ≈12.7% of S_9's mass) is exactly where the drift is largest (LOG.md's
-θ̃−θ* grid: diff=−0.114 at y=3, growing to −0.652 at y=7).
+**Corrected in-repo (2026-09-18, supersedes an earlier "Verified in-repo" note dated the same
+day that this replaces — see notes/decisions.md).** That earlier note interpolated the θ̃−θ*
+grid back onto S_9 draws and called the near-exact match a verification of the mechanism; it
+only verifies grid interpolation, since θ̃−θ* evaluated on the grid and re-applied to the same
+points is definitionally self-consistent (it reproduced θ̃ to `5.55e-17`). Two independent,
+non-circular measurements (`fusion/build_deck.py`) replace it.
+
+**(1) Attribution.** μ̃(t)−μ(t) = (oracle(t)−μ(t)) + (μ̃(t)−oracle(t)) — sampling error plus
+model/approximation error (bootstrap SE, 200 reps):
+t=7: `+0.0153 = +0.0250(sampling) + -0.0097(model)` (`+0.7` SE);
+t=8: `-0.0165 = +0.0019 + -0.0184` (`-0.7` SE);
+t=9: `-0.0662 = -0.0409 + -0.0253` (`-2.6` SE).
+Only t=9 clears 2 SE — at t=7,8 the gap is not distinguishable from sampling noise; even at t=9
+the model-drift term (`-0.0253`) is 38% of the total gap (`-0.0662`), not all of it.
+
+**(2) Counterfactual repair (an ablation of the trained net, not a re-interpolation of its own
+output).** Hold δ(y):=θ̃(y)−θ*(y) FLAT beyond a cutoff c — evaluate θ̃ at min(y,c) while leaving
+θ* itself unclipped — paired on the same S_9 draws (n=2000, 200 reps): full drift shift
+`-0.0286` (sd `0.0018`); repaired flat beyond y=3 → `-0.0178` (y>3 accounts for 38% of the
+shift); repaired flat beyond y=2 → `-0.0023` (y>2 accounts for 92%). The near tail, not the far
+tail, is where the model's drift actually lives.
+
+**(3) Region diagnosis: temporal covariate shift, not extrapolation.** S_9's mass above y=3 is
+12.7% of its total but (per (2)) accounts for only 38% of the shift; the 2<y≤3 band (33.7% of
+S_9's mass) is where the shift concentrates. That band is data-RICH at t=9 but data-POOR during
+training: survey mass share above y=2/3/4, pooled t≤m vs S_9 (200k Monte Carlo draws each):
+`10.0% vs 46.4%` (4.7×); `1.2% vs 12.7%` (10.3×); `0.1% vs 1.5%` (22.8×). The forecast years
+occupy a y-region the training years rarely visit — this is a temporal covariate-shift problem,
+not a tail-extrapolation problem. Consequence: μ̃(t)−oracle(t) grows monotonically with t
+(`-0.0097, -0.0184, -0.0253` at t=7,8,9) — the error should worsen as M−m grows. This is a
+structural property of the data-fusion setup (training years lag the forecast years in y-level),
+not an implementation bug.
+
+**Sharper fix implied by this diagnosis** (beyond the `B=20` bounded-head fix below, which does
+not address this): weight or augment the training years toward the y-region the forecast years
+actually occupy, or constrain θ̃ to be monotone+convex — matching θ*'s known shape below — rather
+than leaving it an unconstrained ReLU MLP.
 
 **Three structural facts the architecture (a generic ReLU MLP) currently ignores** about
 θ*(y) = log Φ(a_m) − log Φ(βy):
@@ -175,11 +216,12 @@ doesn't; it only ever addressed the left-tail blowup at the old β=1.5 default (
 §F's history, notes/decisions.md CP3).
 
 **Consequence: why T7 (parametric recovery) fails under a violated (R3).** T7 fits
-θ(y)=a·(−logΦ(βy))+b by full-batch L-BFGS and asserts |â−1|<0.02. Its survey-side term is
-(1/n)Σᵢ e^{a·θ*(yᵢ)+...}, which at the truth a=1 is the sample mean of w=e^{θ*(Y)}; the
-SAMPLING VARIANCE of that sample mean is Var_S[w] = E_S[w²]−E_S[w]², finite iff βσ<1 (tail
-index a>2 — the k=2 case above). At β=1.5, a=1.444≤2: this variance is infinite (§A's k=2
-column diverges as the integration range grows for β=1.5, converges for β=0.6/0.8). A sample
+θ(y)=a·(−logΦ(βy))+b by full-batch L-BFGS and asserts |â−1|<0.02 (â is T7's own fitted slope,
+unrelated to the tail index κ despite the shared letter "a" in the challenge's original notation).
+Its survey-side term is (1/n)Σᵢ e^{a·θ*(yᵢ)+...}, which at the truth a=1 is the sample mean of
+w=e^{θ*(Y)}; the SAMPLING VARIANCE of that sample mean is Var_S[w] = E_S[w²]−E_S[w]², finite iff
+βσ<1 (tail index κ>2 — the k=2 case above). At β=1.5, κ=1.444≤2: this variance is infinite (§A's
+k=2 column diverges as the integration range grows for β=1.5, converges for β=0.6/0.8). A sample
 mean of a heavy-tailed, right-skewed positive variable is typically BELOW its true expectation
 in any one finite sample (the rare huge draws that would pull it up are usually absent), so the
 survey term's exponential penalty on a moving away from 1 is under-felt, and L-BFGS settles at
@@ -195,12 +237,12 @@ BFGS; **NOT evidence for this repo** — reproduce with a tools/ script if wante
 consistently biased upward at β=1.5, matching the mechanism above.
 
 **Measured decay rate (this repo's own evidence).** From `check_weight_tails.py` §B at β=1.5
-(a=1.444, so the k=2 column above already shows infinite weight variance): bias(n) := (n·bias)/n
+(κ=1.444, so the k=2 column above already shows infinite weight variance): bias(n) := (n·bias)/n
 = 13.98/80=0.1748, 30.86/320=0.0964, 83.27/1280=0.0651 at n=80,320,1280. Each ×4 increase in n
 shrinks the bias by a factor 0.1748/0.0964=1.812 then 0.0964/0.0651=1.482, giving empirical
 exponents log₄(1.812)=0.429 and log₄(1.482)=0.284 (bias ∝ n^{-0.429} then n^{-0.284}). §G's
-stable-law prediction is n^{-(1-1/a)} = n^{-(1-1/1.444)} = n^{-0.308} — the two empirical
+stable-law prediction is n^{-(1-1/κ)} = n^{-(1-1/1.444)} = n^{-0.308} — the two empirical
 exponents bracket this prediction, consistent with it given the run's own Monte-Carlo noise
 (MC SE on n·bias was 0.83, 2.87, 8.50 at n=80,320,1280 respectively — non-trivial next to the
-signal, especially at n=1280). Finite third moment (a>3, e.g. β=0.6) would instead give the
+signal, especially at n=1280). Finite third moment (κ>3, e.g. β=0.6) would instead give the
 ordinary n^{-1} rate.

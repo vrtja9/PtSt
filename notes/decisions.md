@@ -198,3 +198,50 @@ ThetaNet, FOC/θ̃-vs-θ* diagnostics) + `figures/phase3_val_curve_*.png`. Slide
 3 learnings (μ̃ beats both baselines; unbounded nets can blow up in sparse tails; Assumption-1
 violation biases μ̃ in a non-obvious direction) + `figures/phase4_main_figure_*.png`. Rendered in
 `fusion/render_slides.py` (python-pptx) to `slides/deck.pptx`.
+
+## Deck review round 2 — slide 3 corrections and tail-index rename (2026-09-18)
+User reviewed the rebuilt (HARD-RULE, live-numbers) deck and found 4 wrong/unsupported claims and
+2 gaps, all on slide 3, plus a notation collision on slide 1 and a missing R̂_n measurement on
+slide 2. Four fixes, applied in this pass:
+
+1. **Notation (slide 1).** `a_t`/`a_m` (§D's DGP scalars) and the weight-moment tail index
+   (§G/(R3)) were both called `a` on the same slide. The tail index is renamed **κ** everywhere:
+   `docs/math_fixed.md` §C/§D/§G/§H, `CLAUDE.md` §2.5/§3, `fusion/config.py`, `fusion/evaluate.py`,
+   `fusion/run.py`, `fusion/build_deck.py`, `fusion_numpy.py`, `tests/test_t11_weight_tails.py`,
+   `tools/check_weight_tails.py`. `a_t`, `a_m`, and T7's fitted slope `â` are untouched — they are
+   different quantities that happened to share the letter. Slide 1 also gained the missing
+   definition `a_t := βm_t/√(1+β²σ²)` and the closed form `E_St[Y] = m_t + βσ²φ(a_t)/(√(1+β²σ²)Φ(a_t))`,
+   and the sample space is now written `(Y×{0,1}, B(Y)⊗2^{0,1})`.
+2. **R̂_n unbounded-below (slide 2).** Quoted the live values of the piecewise-linear
+   `θ_k=±k`-construction's `R̂_n(k)=(1/2)(e^{-k}-k)` at k=0,1,2,4,8 next to the trained best
+   validation loss, so "unbounded below" is a measurement, not an assertion.
+3. **Slide 3, three claims corrected, one added** — see `docs/math_fixed.md` §H (the full
+   derivation and live numbers) and `notes/talk_through.md` items 11-12 and its Q&A section for
+   the corrected narrative:
+   - The **circular check** (interpolating θ̃−θ* back onto itself and calling the near-exact match
+     a verification) is deleted. Replaced with a genuine ablation: hold θ̃'s drift flat beyond a
+     cutoff c and recompute μ̃(9) on paired draws.
+   - **Attribution**: μ̃−μ = (oracle−μ)+(μ̃−oracle) shows the t=9 gap is only 38% model drift, the
+     rest sampling; t=7,8's gaps (0.7 SE) are not distinguishable from sampling noise at all.
+   - **Region diagnosis**: the far tail (y>3, 12.7% of `S_9`'s mass) explains only ~38% of the
+     drift-shift; the 2<y≤3 band (33.7% of mass) dominates it, and that band is data-rich at t=9
+     but data-poor in training (mass share above y=2, pooled t≤m vs `S_9`: 10.0% vs 46.4%, 4.7×)
+     — a temporal covariate shift, not a tail-extrapolation problem. Reframed as a structural
+     property of the data-fusion setup (μ̃−oracle grows monotonically with t), and added the
+     sharper fix this diagnosis implies: reweight/augment training years toward the forecast
+     years' y-region, or constrain θ̃ to be monotone+convex.
+   - **Added headline** (previously missing): μ̃ cuts the survey's bias vs μ(t) by 93%/91%/49% at
+     t=7/8/9 (`1 − |μ̃−μ|/|survey−μ|`), now the table's last column and Learning 3's opening line.
+4. `notes/talk_through.md` was re-examined for the same three errors and corrected to match,
+   including giving "why does μ̃ undershoot at t=9" a two-part answer (sampling is the larger
+   share at 62%; covariate shift explains the smaller, model-attributable 38%) instead of the
+   previous one-part ("θ̃ drift alone explains it") answer.
+
+**Reproducibility note.** The user's own reference numbers for the counterfactual repair (full
+drift `-0.0375`; y>3 contributes 30%; y>2 contributes 76%) were flagged by the user as "model
+retrained since" and did NOT reproduce exactly on this pass's fresh training run (measured:
+full drift `-0.0286`; y>3 contributes 38%; y>2 contributes 92% — same qualitative finding, the
+near-tail band dominates over the far tail, just a different split). The decomposition,
+bias-reduction percentages, and covariate-shift mass-share ratios all matched the user's
+reference numbers closely (within Monte Carlo noise). Per the HARD RULE, the live numbers from
+this run — not the stale reference — are what the rebuilt slide/docs quote.

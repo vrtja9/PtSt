@@ -23,14 +23,14 @@ def _hajek_oracle(cfg: Config, y: np.ndarray) -> float:
 
 
 def test_T11a_weight_moment_rule_assertion():
-    """(a) beta*sigma < 1/sqrt(2), assertion message quotes a = 1+1/(beta^2 sigma^2) and (R3)."""
+    """(a) beta*sigma < 1/sqrt(2), assertion message quotes kappa = 1+1/(beta^2 sigma^2) and (R3)."""
     cfg = Config()
-    a = 1 + 1 / (cfg.beta ** 2 * cfg.sigma ** 2)
+    kappa = 1 + 1 / (cfg.beta ** 2 * cfg.sigma ** 2)
     assert cfg.beta * cfg.sigma < 1 / np.sqrt(2), (
         f"(R3) violated: beta*sigma={cfg.beta * cfg.sigma:.4f} >= 1/sqrt(2); "
-        f"tail index a={a:.3f} <= 3 (docs/math_fixed.md SS G)"
+        f"tail index kappa={kappa:.3f} <= 3 (docs/math_fixed.md SS G)"
     )
-    print(f"T11(a): beta={cfg.beta} sigma={cfg.sigma} beta*sigma={cfg.beta*cfg.sigma:.4f} a={a:.3f}")
+    print(f"T11(a): beta={cfg.beta} sigma={cfg.sigma} beta*sigma={cfg.beta*cfg.sigma:.4f} kappa={kappa:.3f}")
 
 
 def test_T11b_n_eff_stability_over_seeds():

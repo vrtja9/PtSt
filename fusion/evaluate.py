@@ -134,10 +134,10 @@ def stress_test_violate_r3(cfg: Config, n_seeds: int = 10, n_bootstrap: int = 20
     exponents = [float(np.log(biases[i] / biases[i + 1]) / np.log(ns[i + 1] / ns[i]))
                  for i in range(len(ns) - 1)]
 
-    a = 1 + 1 / (heavy.beta ** 2 * heavy.sigma ** 2)
-    predicted_exponent = 1 - 1 / a
+    kappa = 1 + 1 / (heavy.beta ** 2 * heavy.sigma ** 2)
+    predicted_exponent = 1 - 1 / kappa
     return {
-        "beta": heavy.beta, "sigma": heavy.sigma, "a": a,
+        "beta": heavy.beta, "sigma": heavy.sigma, "kappa": kappa,
         "n_eff_cv": n_eff_cv, "n_eff_mean": float(n_eff_fracs.mean()), "n_eff_sd": float(n_eff_fracs.std()),
         "delta_se": delta_se, "mc_sd": float(boot.std()), "se_ratio": se_ratio,
         "ns": ns, "n_biases": n_biases, "biases": biases, "exponents": exponents,

@@ -11,7 +11,7 @@ import numpy as np
 from scipy.stats import norm
 
 # ---------------- 0.4 config (a C struct with defaults, serialised with every output) ----------------
-CFG = dict(m=6, M=9, n=2000, sigma=1.0, beta=0.6, H=32, lr=1e-2, wd=1e-4,  # (R3): beta*sigma < 1/sqrt(2); tail index a = 3.78
+CFG = dict(m=6, M=9, n=2000, sigma=1.0, beta=0.6, H=32, lr=1e-2, wd=1e-4,  # (R3): beta*sigma < 1/sqrt(2); tail index kappa = 3.78
            epochs=150, batch=256, seed_data=0, seed_model=1, val_frac=0.2)
 m_t = lambda t: -0.5 + 0.25 * t          # population mean drifts (P_{t,Y} = N(m_t, sigma^2))
 c_t = lambda t: 0.9 - 0.06 * t           # overall response level drifts (never enters S_t)

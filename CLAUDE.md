@@ -73,7 +73,7 @@ challenge's loss (2); the estimate is the self-normalised weighted survey mean
 - CP0 after environment setup (show `python -c "import torch,numpy,scipy"` output).
 - CP1 DGP choice (before writing fusion/dgp.py). ANSWERED: the default is docs/math_fixed.md §D
   with β=0.6. Re-ask only if a proposed change would violate (R3); any proposal must state the
-  tail index a and show a > 3.
+  tail index κ and show κ > 3.
 - CP2 after Phase 2 tests pass (show pytest output).
 - CP3 after first training run: show val curve, FOC table, θ̃ vs θ* figure; propose hyperparameters.
 - CP4 which stress tests to run (offer the three defaults).
@@ -94,7 +94,7 @@ challenge's loss (2); the estimate is the self-normalised weighted survey mean
 - Estimator for t > m (needs no α):  μ̃(t) = Σ_i e^{θ̃(y_i)} y_i / Σ_i e^{θ̃(y_i)},  y_i ~ S_t.
 - Diagnostics: FOC mean_i e^{θ̃(y^S_{t,i})+α̃(t)} = 1 for t ≤ m;  n_eff = (Σw)²/Σw².
 - Baselines: survey mean ȳ_{S_t};  offset: μ(m) + (ȳ_{S_t} − ȳ_{S_m});  oracle: μ̃ with θ*.
-- (R3) βσ < 1/√2 for the default DGP; tail index a = 1 + 1/(β²σ²) must be stated whenever β or σ
+- (R3) βσ < 1/√2 for the default DGP; tail index κ = 1 + 1/(β²σ²) must be stated whenever β or σ
   is proposed or changed (docs/math_fixed.md §G).
 - Reading α̃: by the Step-8 FOC, α̃(t) = −log E_{S_t}[e^{θ̃}], a functional of θ̃ under year t's
   survey law. An error in θ̃ that is constant where S_t has mass shifts α̃(t) by minus that
