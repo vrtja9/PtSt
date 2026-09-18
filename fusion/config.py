@@ -92,16 +92,18 @@ class Config:
 def git_commit_hash() -> str:
     """Best-effort short commit hash for tagging saved figures/tables (CLAUDE.md §2.4).
 
-    # DECISION (2026-09-18, M1 fix): this reads HEAD at GENERATION time, which is necessarily
-    # the commit *before* the one that will eventually commit this exact figure+code together
-    # (a commit cannot embed its own hash). So the value stamped into a figure's JSON should be
-    # read as "the code state that produced this," not "check this hash out to find the file."
-    # To find which commit actually contains a given figure, use `git log --diff-filter=A
-    # --format=%h -- <path>` -- every figures/*.json's "commit" field in this repo has been
-    # corrected to that value (not the raw git_commit_hash() output) as of the 2026-09-18 fix;
-    # any figure generated after that fix and committed in the SAME commit it's generated for
-    # will again show this one-commit lag until a follow-up correction, same as any commit hash
-    # embedded before its own commit exists.
+    # INVARIANT (2026-09-18, corrected per C1): the recorded hash is the commit containing the
+    # CODE AND CONFIG that produced the artifact -- the commit from which re-running the
+    # generating command reproduces the PNG. It is NOT the commit containing the artifact file
+    # itself (a commit cannot embed its own hash), and it is NOT necessarily the commit that
+    # ADDED the file: a regenerated figure must cite the commit of the code that regenerated it,
+    # which can be an EARLIER commit than the one that (re-)added the PNG, if no relevant code
+    # changed between them. Because this function reads HEAD at generation time (necessarily the
+    # last real commit, since the one now being prepared doesn't exist yet), a figure generated
+    # from code with uncommitted changes will show a stale value until corrected in a follow-up
+    # commit once the reproducing commit exists (see notes/decisions.md's C1 audit for the
+    # per-figure correction and, before it, the same fix applied via first-add instead of this
+    # invariant, which was itself wrong for two figures -- corrected in the follow-up commit).
     """
     try:
         out = subprocess.check_output(

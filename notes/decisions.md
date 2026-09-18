@@ -128,6 +128,18 @@ in its prose (the actual code, `fusion/evaluate.stress_test_assumption1_broken`,
 and `fusion/render_slides.py`'s slide-1 bullet text still say "beta=1.5" (Phase 5 deliverable,
 not touched under this authorization's scope).
 
+## C1-C4 follow-up corrections (2026-09-18)
+C1: `git_commit_hash()`'s docstring now states the code-commit invariant (the commit whose
+CURRENT code reproduces the artifact, not the commit that added the file); re-audited all 10
+current figures against it (LOG.md "C1-C4 follow-up corrections" has the per-figure diff).
+C3: `check_weight_tails.py` §B and T11(d) now use a three-outcome label (DISAGREES / CONSISTENT /
+TOO WIDE TO DISTINGUISH) keyed on interval half-width, not containment alone, at n=40,80,160,320
+with 10000 reps (n=1280 dropped as unresolvable). C4: new docs/math_fixed.md §H "Residual error
+after (R3)" records that the remaining μ̃(t>m) error is θ̃'s approximation error (not sampling
+error, since n_eff/n=0.93-0.96), verified to fully account for μ̃(9)'s gap via the interpolated
+θ̃−θ* drift (LOG.md has the numbers), and that `cfg.theta_bounded=20` never binds over the
+training range — recorded, not changed, so slide 3 doesn't overclaim what the CP3 fix did.
+
 ## Known stale: Phase 5 slides reference beta=1.5-era content (2026-09-18)
 Not edited in this pass (explicitly out of scope; user said "decide and report, do not act").
 **3 of 3 slides are affected.** Checklist for the eventual Phase 5 rebuild

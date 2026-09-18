@@ -141,6 +141,39 @@ n^{−(1−1/a)} rather than n^{−1/2} and look noisy even when the code is cor
 
 Evidence: `tools/check_weight_tails.py` (LOG.md "beta correction" entry has the full stdout).
 
+## H. Residual error after (R3): θ̃ approximation error, not sampling error
+
+With (R3) satisfied (β=0.6), n_eff/n = 0.93–0.96 (Phase 3 table, LOG.md) — the weight-VARIANCE
+term of the estimator's error is healthy. The residual gap between μ̃(t) and the oracle for t>m
+is instead the APPROXIMATION term of the error decomposition — θ̃ vs θ* itself — concentrated
+where S_t has mass but the t≤m training data thins out.
+
+**Verified in-repo (2026-09-18).** Interpolating the θ̃−θ* grid (`fusion.train.theta_grid_data`)
+onto S_9 draws and using it in place of θ̃ reproduces the actual μ̃(9)−oracle(9) gap essentially
+exactly: implied shift = `-0.0286` (paired at the same seeds against the actual trained-model gap:
+also `-0.0286`, sd `0.0055` over 500 reps of n=200); at n=2000 (Phase 3's own table) the actual
+single-draw gap is `-0.0273`. So the θ̃-vs-θ* drift alone fully accounts for the μ̃(9) undershoot —
+there is no separate, unexplained error term. S_9's mass above y=3,4,5 is `0.1273, 0.0147, 0.0008`
+— the right tail (y>3, ≈12.7% of S_9's mass) is exactly where the drift is largest (LOG.md's
+θ̃−θ* grid: diff=−0.114 at y=3, growing to −0.652 at y=7).
+
+**Three structural facts the architecture (a generic ReLU MLP) currently ignores** about
+θ*(y) = log Φ(a_m) − log Φ(βy):
+- Strictly DECREASING in y (verified: monotone decreasing over a 2000-point grid on [-10,10]).
+- CONVEX (−log Φ is convex, Φ being log-concave).
+- BOUNDED BELOW by log Φ(a_m) = `-0.3616` (verified) — θ* never goes below this as y→+∞.
+
+None of these are imposed on θ̃'s functional form; an unconstrained ReLU MLP can (and does)
+extrapolate with the wrong slope and curvature past where training data is dense.
+
+**`cfg.theta_bounded=20` never binds.** θ* ∈ `[-0.362, 4.232]` over the training range
+`[-3.868, 4.982]` (verified: θ*(-3.868)=`4.229`, θ*(0)=`0.332`, θ*(4.982)=`-0.360`), while
+`B·tanh(·/B)` at B=20 only starts to compress once |θ| approaches 20 — it would need B≈5 to
+meaningfully constrain anything in this range. Recorded here, not changed in this pass, so any
+slide claiming the CP3 bounded-head fix addresses the right-tail drift would be dishonest — it
+doesn't; it only ever addressed the left-tail blowup at the old β=1.5 default (docs/math_fixed.md
+§F's history, notes/decisions.md CP3).
+
 **Consequence: why T7 (parametric recovery) fails under a violated (R3).** T7 fits
 θ(y)=a·(−logΦ(βy))+b by full-batch L-BFGS and asserts |â−1|<0.02. Its survey-side term is
 (1/n)Σᵢ e^{a·θ*(yᵢ)+...}, which at the truth a=1 is the sample mean of w=e^{θ*(Y)}; the

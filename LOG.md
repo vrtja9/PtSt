@@ -221,3 +221,26 @@ beta=0.6 delta SE/MC sd (0.0342/0.0347 here vs quoted 0.0397/0.0360, quoted at 4
 script's 200) differ in the individual numbers while the qualitative phenomenon (flat sd*sqrt(n)
 at beta=0.6, ratio near 1) matches; section A, D, E numbers match the reference closely or
 exactly where directly comparable.
+
+## C1-C4 follow-up corrections (2026-09-18)
+- C1: git_commit_hash() docstring corrected to the code-commit invariant (not first-add).
+  Re-audit via `git log -1 --format=%h -- <dep files>` per figure: 8 of 10 figures' cited commit
+  changed from a350bbd to 15c7504 (fusion/config.py and fusion/run.py were both touched in
+  15c7504, even though most of that commit's edits didn't affect those figures' pixels -- the
+  file-level check is coarser than a code-path-level one, but matches the method specified).
+  2 figures (phase4_stress1_assumption1, phase4_stress4_violate_r3) already correctly cited
+  15c7504 from the prior fix.
+- C2: `ls figures/ | wc -l` -> 20 (10 PNG + 10 JSON), as expected after M3's cleanup + A3's
+  stress-4 addition.
+- C3: `python tools/check_weight_tails.py` SS B re-run at n=(40,80,160,320), 10000 reps
+  (15.3s total runtime): beta=0.6 n=40 n*bias=+0.990 [+0.805,+1.174] CONSISTENT (17% half-width);
+  n=80 +1.126 [+0.853,+1.398] CONSISTENT (25%); n=160 +0.777 [+0.375,+1.180] CONSISTENT (37%);
+  n=320 +1.103 [+0.521,+1.684] TOO WIDE TO DISTINGUISH. Predicted 1.084. tests/test_t11_weight_tails.py
+  T11(d) updated to match (11.0s for the whole T11 file) -- identical numbers (same seed=21).
+- C4(a): interpolating the theta~-theta* grid onto S_9 draws reproduces the actual model-vs-oracle
+  gap essentially exactly -- implied shift -0.0286 (sd 0.0055, 500 reps of n=200) vs actual
+  -0.0286 (paired, same seeds) / -0.0273 (single n=2000 draw, matches Phase 3's table row).
+  S_9 mass shares: P(Y>3)=0.1273, P(Y>4)=0.0147, P(Y>5)=0.0008. Verified theta* bounds:
+  theta*(-3.868)=4.229, theta*(0)=0.332, theta*(4.982)=-0.360, log Phi(a_m)=-0.3616, strictly
+  decreasing over a 2000-point grid on [-10,10]. cfg.theta_bounded=20 confirmed never binding
+  (|theta*|<=4.23 over the training range).

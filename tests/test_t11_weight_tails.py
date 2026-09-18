@@ -63,8 +63,17 @@ def test_T11c_se_calibration():
 
 
 def test_T11d_finite_sample_bias_report_only():
-    """(d) report-only: n*(mean mu~ - mu) at n=80,320,1280 (1000 reps) vs the predicted constant
-    -E_S[w^2(Y-mu)]/E_S[w]^2 from numerical integration. No assertion (per Edit H)."""
+    """(d) report-only: n*(mean mu~ - mu) at n=40,80,160,320 (10000 reps) vs the predicted
+    constant -E_S[w^2(Y-mu)]/E_S[w]^2 from numerical integration. No assertion (per Edit H).
+
+    n=1280 is dropped (C3, 2026-09-18): even at 10000 reps its MC SE cannot resolve the identity
+    -- the informative statistic at large n is the FLATNESS of sd*sqrt(n) across n, not any one
+    n*bias value. At the kept n's, each interval (nbias +/- 2*MC_SE) is labeled DISAGREES (outside
+    the predicted value), CONSISTENT (contains it AND half-width <= 50% of it -- an interval that
+    actually verifies the SS C bias identity), or TOO WIDE TO DISTINGUISH (contains it but the
+    interval is too wide, >50% of it, for that containment to mean anything) -- containment alone
+    is agreement, never "uninformative" by itself.
+    """
     cfg = Config()
     mu = float(dgp.m_t(cfg, 1))
     am, a1 = dgp.a_t(cfg, cfg.m), dgp.a_t(cfg, 1)
@@ -81,7 +90,17 @@ def test_T11d_finite_sample_bias_report_only():
     print(f"T11(d): predicted n*bias = {predicted:.3f}")
 
     rng = np.random.default_rng(21)
-    for n in (80, 320, 1280):
-        est = np.array([_hajek_oracle(cfg, dgp.draw_survey(cfg, rng, 1, n)) for _ in range(1000)])
-        print(f"T11(d): n={n:5d}  n*bias={n * (est.mean() - mu):+.2f} "
-              f"(MC SE {n * est.std() / np.sqrt(1000):.2f})  sd*sqrt(n)={est.std() * np.sqrt(n):.3f}")
+    n_reps = 10000
+    for n in (40, 80, 160, 320):
+        est = np.array([_hajek_oracle(cfg, dgp.draw_survey(cfg, rng, 1, n)) for _ in range(n_reps)])
+        nbias = n * (est.mean() - mu)
+        half_width = 2 * n * est.std() / np.sqrt(n_reps)
+        lo, hi = nbias - half_width, nbias + half_width
+        if not (lo <= predicted <= hi):
+            flag = "DISAGREES"
+        elif half_width <= 0.5 * abs(predicted):
+            flag = f"CONSISTENT (half-width {100 * half_width / abs(predicted):.0f}% of prediction)"
+        else:
+            flag = "TOO WIDE TO DISTINGUISH"
+        print(f"T11(d): n={n:5d}  n*bias={nbias:+.3f}  observed+-2*MC_SE=[{lo:+.3f}, {hi:+.3f}] "
+              f"sd*sqrt(n)={est.std() * np.sqrt(n):.3f}  {flag}")

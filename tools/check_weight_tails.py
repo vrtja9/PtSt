@@ -3,10 +3,17 @@ Run:  python tools/check_weight_tails.py   (from any cwd; the shim below puts th
 C/C++ -> Python -> R: quad() is adaptive Gauss-Kronrod numerical integration (GSL's
 gsl_integration_qag in C; integrate() in R); the loops below are the same quantities
 obtained by Monte-Carlo sampling instead of quadrature.
-Section B note (A5, 2026-09-18): at n=1280 the MC SE on n*bias is large relative to the
-predicted constant, so a single n*bias value is not informative there -- the informative
-statistic at large n is the FLATNESS of sd*sqrt(n) across n (flat = O(1/n) bias regime holding),
-not whether any one n*bias sits exactly on the predicted line."""
+Section B note (C3, 2026-09-18, supersedes the A5 note this replaced -- that one wrongly labeled
+an interval containing the prediction as "UNINFORMATIVE"; containment there means the test
+AGREES with the prediction, not that it says nothing): at n=40..320 with 10000 reps, the interval
+half-width (2*MC_SE) verifies the SS C bias identity (E[mu~]-mu ~= -E_S[w^2(Y-mu)]/(n E_S[w]^2))
+directly -- CONSISTENT means the prediction is inside the interval AND the interval is tight
+enough (half-width <= 50% of the prediction) to mean something; DISAGREES means the prediction
+falls outside; TOO WIDE TO DISTINGUISH means the interval contains the prediction but is too
+wide (>50% of it) for that containment to be informative. n=1280 is dropped here: even at 10000
+reps its MC SE cannot resolve the identity (verified below) -- the informative statistic at
+large n is instead the FLATNESS of sd*sqrt(n) across n (flat = O(1/n) bias regime holding), not
+any one n*bias value."""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root: fusion_numpy.py lives there
@@ -61,15 +68,22 @@ for beta in (0.6, 1.5):
         pred, chk = "not defined (a<=3, third moment infinite)", ""
     print("  beta=%.1f  a=%.2f  predicted n*bias -> %s%s" % (beta, a, pred, chk))
     rng = np.random.default_rng(21)
-    for n in (80, 320, 1280):
-        est = np.array([hajek(F.draw_survey(rng, T1, n)) for _ in range(1000)])
+    n_reps = 10000
+    for n in (40, 80, 160, 320):
+        est = np.array([hajek(F.draw_survey(rng, T1, n)) for _ in range(n_reps)])
         nbias = n * (est.mean() - mu)
-        mc_se = n * est.std() / np.sqrt(1000)
-        lo, hi = nbias - 2 * mc_se, nbias + 2 * mc_se
+        mc_se = n * est.std() / np.sqrt(n_reps)
+        half_width = 2 * mc_se
+        lo, hi = nbias - half_width, nbias + half_width
         flag = ""
-        if pred_val is not None and lo <= pred_val <= hi:
-            flag = "  UNINFORMATIVE"
-        print("     n=%5d  n*bias=%+8.2f  observed +-2*MC_SE=[%+.2f, %+.2f]   sd*sqrt(n)=%.3f%s"
+        if pred_val is not None:
+            if not (lo <= pred_val <= hi):
+                flag = "  DISAGREES"
+            elif half_width <= 0.5 * abs(pred_val):
+                flag = "  CONSISTENT (half-width %.0f%% of prediction)" % (100 * half_width / abs(pred_val))
+            else:
+                flag = "  TOO WIDE TO DISTINGUISH"
+        print("     n=%5d  n*bias=%+8.3f  observed +-2*MC_SE=[%+.3f, %+.3f]   sd*sqrt(n)=%.3f%s"
               % (n, nbias, lo, hi, est.std() * np.sqrt(n), flag))
 
 print("== C. delta-method SE vs Monte-Carlo sd of mu~ (t=1, n=2000, 200 reps) ==")
