@@ -110,12 +110,52 @@ variance and third moment (a=3.78), so the L-BFGS parametric-recovery fit conver
 lower variance; the CP2 entry above is left as the historical record of what was observed and
 decided at the time, not rewritten.
 
+**T7's CP2 failure is now explained, not just fixed** (2026-09-18, docs/math_fixed.md §G
+"Consequence: why T7 (parametric recovery) fails under a violated (R3)"): T7's survey term at
+the truth a=1 is the sample mean of w=e^{θ*(Y)}; its sampling variance is infinite whenever
+βσ≥1 (a≤2 — confirmed for β=1.5 by `check_weight_tails.py` §A's diverging k=2 column), and a
+sample mean of a heavy-tailed positive variable is typically below its expectation in any one
+finite sample, biasing the L-BFGS fit's â upward — exactly the direction CP2 observed
+(â=1.0255). T7's old failure was therefore a SYMPTOM of the same (R3) violation being corrected
+in this pass, not an independent training-hyperparameter or optimizer bug, and must not be
+re-litigated as one; see docs/math_fixed.md §G for the full mechanism and the measured decay
+rate matching the theorem's stable-law exponent.
+
 Known, deliberately out-of-scope staleness (not fixed, since the authorization did not cover it):
 docs/math_fixed.md §E stress-test 1's `b_t = 1.5 + 0.1(t−m)` literal still reads the old β value
 in its prose (the actual code, `fusion/evaluate.stress_test_assumption1_broken`, already uses
 `cfg.beta + 0.1*(t-m)` and so is automatically consistent with the new default); `slides/deck.md`
 and `fusion/render_slides.py`'s slide-1 bullet text still say "beta=1.5" (Phase 5 deliverable,
 not touched under this authorization's scope).
+
+## Known stale: Phase 5 slides reference beta=1.5-era content (2026-09-18)
+Not edited in this pass (explicitly out of scope; user said "decide and report, do not act").
+**3 of 3 slides are affected.** Checklist for the eventual Phase 5 rebuild
+(`fusion/render_slides.py`'s `SLIDES` list, `slides/deck.pptx`, `slides/deck.md`):
+- **Slide 1** ("The data-generating process"): text bullet "beta=1.5" is wrong (now 0.6); text
+  bullet "shrinks from ~0.78 (t=1) to ~0.12 (t=9)" is wrong (now ≈0.45/≈0.17, docs/math_fixed.md
+  §D); embedded figure `phase1a_densities_4b6ab92b.png` was generated at β=1.5 (visually more
+  separated p_t/s_t curves than the current β=0.6 version) — replace with
+  `phase1a_densities_96169d0c.png`.
+- **Slide 2** ("Optimization pipeline"): text bullets don't cite a beta value so are not wrong,
+  but the embedded figure `phase3_val_curve_8e4fef38.png` was generated at the old β=1.5 default
+  (post-CP3) — replace with `phase3_val_curve_96169d0c.png` (both are smooth/monotone post-CP3,
+  but the underlying numbers differ).
+- **Slide 3** ("Comparison and learnings"): text bullet "Learning 1: ... (t=9: 1.752 vs true
+  1.75, survey mean 1.858, offset 1.601)" is wrong — current β=0.6 values (`python -m fusion.run
+  --phase 3`, config hash `96169d0c`) are t=9: mu_true=1.750, survey_mean=1.888, mu_tilde=1.696,
+  offset=1.677; embedded figure `phase4_main_figure_8e4fef38.png` was generated at β=1.5 —
+  replace with `phase4_main_figure_96169d0c.png`. Learnings 2 and 3's prose describes historical
+  events (the CP3 tail-blowup fix, the stress-1 non-monotonic finding) that remain true as
+  historical claims, though stress 1's own numbers have since changed twice (beta correction,
+  then A3(a)'s baseline fix) — worth re-checking against notes/derivations.md's current stress-1
+  numbers when the deck is rebuilt.
+Note: `slides/deck.pptx`'s embedded images are baked into the file at build time (python-pptx
+copies image bytes in, not a live reference), so deleting the stale source PNGs from `figures/`
+(this session's M3 fix) does not corrupt the existing pptx — it just means `fusion/render_slides.py`
+can no longer rebuild slide 1/2/3's images from the now-deleted `_4b6ab92b`/`_8e4fef38` filenames
+without first re-pointing the `SLIDES` list at the current `_96169d0c` figures, which is exactly
+the rebuild this checklist is for.
 
 ## CP5 — slide text (2026-09-16)
 Proposed 3-slide text (docs/challenge_text.md §4) sent to the user; **reply: `Go`**. Slide 1:

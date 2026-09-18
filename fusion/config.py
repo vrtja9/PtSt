@@ -90,7 +90,19 @@ class Config:
 
 
 def git_commit_hash() -> str:
-    """Best-effort short commit hash for tagging saved figures/tables (CLAUDE.md §2.4)."""
+    """Best-effort short commit hash for tagging saved figures/tables (CLAUDE.md §2.4).
+
+    # DECISION (2026-09-18, M1 fix): this reads HEAD at GENERATION time, which is necessarily
+    # the commit *before* the one that will eventually commit this exact figure+code together
+    # (a commit cannot embed its own hash). So the value stamped into a figure's JSON should be
+    # read as "the code state that produced this," not "check this hash out to find the file."
+    # To find which commit actually contains a given figure, use `git log --diff-filter=A
+    # --format=%h -- <path>` -- every figures/*.json's "commit" field in this repo has been
+    # corrected to that value (not the raw git_commit_hash() output) as of the 2026-09-18 fix;
+    # any figure generated after that fix and committed in the SAME commit it's generated for
+    # will again show this one-commit lag until a follow-up correction, same as any commit hash
+    # embedded before its own commit exists.
+    """
     try:
         out = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL

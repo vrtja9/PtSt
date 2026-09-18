@@ -137,7 +137,9 @@ the theorem predicts; C ratio 0.99 at beta=0.6, within [0.75,1.33]; D CV=0.048 a
 under 0.20).
 
 `python tools/twin_default_run.py` full stdout (config beta=0.6,H=32,lr=3e-3,wd=1e-5,epochs=400,
-batch=256,seed_data=0,seed_model=1; commit b4a438d):
+batch=256,seed_data=0,seed_model=1; commit a350bbd -- corrected from an earlier draft that cited
+b4a438d, which does not contain tools/twin_default_run.py; verified via
+`git show a350bbd --stat | grep twin_default`):
 ```
 config: {'m': 6, 'M': 9, 'n': 2000, 'sigma': 1.0, 'beta': 0.6, 'H': 32, 'lr': 0.003, 'wd': 1e-05, 'epochs': 400, 'batch': 256, 'val_frac': 0.2, 'seed_data': 0, 'seed_model': 1}
 best val 0.4455 at epoch 394
@@ -188,9 +190,23 @@ beta=0.6 hash 96169d0c): `python -m fusion.run --phase 1`, `--phase 3`
 - phase3_alpha_hat_vs_star: alpha~ sits uniformly above alpha* across t=1..5, meeting at the t=6
   anchor -- a small roughly-constant offset (CLAUDE.md SS3's new reading rule: not a failure by
   itself).
-- phase3_theta_hat_vs_star: NEW finding -- theta~ and theta* track closely for y<-2 and near 0,
-  but DIVERGE in the right tail (theta* plateaus near -0.4, theta~ keeps decreasing past y~2) --
-  opposite tail from the old beta=1.5 issue; flagged per the new extrapolation-reporting rule.
+- phase3_theta_hat_vs_star: **CORRECTED 2026-09-18 (M2)** -- the original "track closely for
+  y<-2" line above was wrong; a linear-scale plot dominated by theta values near 8 (at y~-6)
+  visually hides a real secondary divergence. Precise grid from a re-run of the SAME torch model
+  behind this figure (`python -m fusion.run --phase 3`, deterministic, same seeds; NOT the numpy
+  twin -- `tools/twin_default_run.py`'s printed grid, e.g. +5.71 at y=-3, is a DIFFERENT,
+  unbounded model with its own hyperparameters and is not comparable to this figure), x-range
+  [-6.25, 7.75], y-axis auto-scaled to the data (no fixed limits set in fusion/run.py):
+  y=-6:diff=-0.078  y=-5:diff=+0.605  y=-4:diff=+0.850  y=-3:diff=+0.699  y=-2.5:diff=+0.489
+  y=-2:diff=+0.195  y=-1:diff=-0.049  y=0:diff=-0.049  y=1:diff=-0.015  y=2:diff=-0.054
+  y=3:diff=-0.114  y=4:diff=-0.227  y=5:diff=-0.367  y=6:diff=-0.507  y=7:diff=-0.652
+  (Y.min/max = -3.87/4.98). Per-region description consistent with these numbers: (1) left tail
+  y in [-5,-2.5]: a real bump, theta~ OVERSHOOTS theta* by up to +0.85 (at y~-4), shrinking back
+  toward 0 by y~-6; (2) middle -2<y<2 (where most S_t mass for t<=m lives): good agreement,
+  |diff|<=0.2; (3) right tail y>3: theta~ UNDERSHOOTS theta* by a growing amount, from -0.11 at
+  y=3 to -0.65 at y=7, while theta*(y) itself is nearly flat (plateaus near -0.36) -- this is the
+  region relevant to t=7,8,9 (Y ranges m_t(7..9) +/- a few sigma), so it is the more consequential
+  tail for mu~(t>m).
 - phase4_main_figure: mu~(t) tracks mu(t) closely in- and out-of-sample, better than survey mean,
   comparable to the offset baseline.
 - phase4_stress1: bias -0.092/-0.160/-0.155 at drift 0.10/0.20/0.30 -- still non-monotonic.

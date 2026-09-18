@@ -64,15 +64,37 @@ Symbols added here: π_t(y):=P_{P_t}[R=1|Y=y]; ρ̄_t:=P_{P_t}[R=1]; λ dominati
   two-subgroup mixture with drifting weight.
 
 ## E. Stress tests (Phase 4 defaults; confirm at CP4)
-1. Assumption 1 broken: π_t(y) = σ(a_t + b_t y), b_t = 1.5 + 0.1(t−m) for t>m. Expect μ̃ bias growing with |b_t−b_m|.
+1. Assumption 1 broken: π_t(y) = σ(a_t + b_t y), b_t = 1.0 + 0.1(t−m) for t>m. Expect μ̃ bias growing with |b_t−b_m|.
+   (2026-09-18, authorized correction: the baseline slope is chosen so the LOGISTIC selection at
+   t=m matches the STRENGTH of the default probit DGP at t=m, not its old β=1.5 literal value —
+   Φ(x) ≈ σ(1.702x), so β=0.6 (the current default) corresponds to a logistic slope of
+   1.702×0.6≈1.02≈1.0. Using the old literal β=1.5 as the logistic baseline would have perturbed
+   both the functional FORM (probit→logistic) and the STRENGTH at once, confounding the reading
+   of the stress test's own bias trend.)
+
+   **Caveat — this stress test does NOT exercise (R3).** Under logistic selection, the weight
+   behaves like e^{−a−by} as y→−∞ (LINEAR in the exponent), and against a Gaussian density
+   e^{−y²/2σ²} every moment of w is finite for ANY b (the Gaussian's quadratic decay always wins
+   against the logistic's linear one). Probit selection is different precisely because
+   −logΦ(βy) ~ β²y²/2 is QUADRATIC and competes with the Gaussian on equal terms — that
+   competition is what produces §G's power-law weight tail. So stress test 1 tests a violation
+   of Assumption 1 ONLY; it must never be cited as covering the (R3) heavy-tail failure mode
+   (see stress test 4 for that).
 2. Support shift: m_t jumps by +2σ for t>m. Report the fraction of t>m survey values outside the training range.
 3. Small n: n ∈ {200, 500, 2000}. Report sd of μ̃ over 10 seeds; expect ∝ 1/√n_eff.
+4. (2026-09-18, authorized addition) Violate (R3) on purpose: PROBIT selection (the default
+   family, not stress test 1's logistic) with βσ ≥ 1 — `Config(beta=1.5, allow_heavy_tails=True)`
+   (the `allow_heavy_tails` opt-in exists exactly for this). Report n_eff/n CV over 10 seeds, the
+   delta-SE-to-Monte-Carlo-sd ratio, and the fitted decay exponent of the oracle bias; check all
+   three against §G's diagnostic signature (CV≥0.20-ish, ratio far from 1, exponent below the
+   finite-moment n^{-1} rate). This is the ONLY stress test that exercises (R3); stress test 1
+   does not (see its caveat above).
 
 ## F. Evidence from the numpy twin (reproduce before trusting; re-run 2026-09-18 at the corrected β=0.6)
 - Command: `python tools/twin_default_run.py`. Config: `{m:6, M:9, n:2000, sigma:1.0, beta:0.6,
   H:32, lr:0.003, wd:1e-05, epochs:400, batch:256, val_frac:0.2, seed_data:0, seed_model:1}`.
-  Git commit at run time: `b4a438d` (the commit that includes this file's own edit is later;
-  see STEP 5 of notes/decisions.md's "Authorized correction" entry). Full stdout:
+  Git commit: `a350bbd` (verified: `git show a350bbd --stat | grep twin_default` lists
+  `tools/twin_default_run.py`, so checking out this commit reproduces the config above). Full stdout:
   ```
   best val 0.4455 at epoch 394
   FOC   : {1: 1.013, 2: 0.99, 3: 0.988, 4: 0.99, 5: 0.99, 6: 0.979}
@@ -118,3 +140,34 @@ and α̃(t) are sample means of w, so under infinite variance they converge at t
 n^{−(1−1/a)} rather than n^{−1/2} and look noisy even when the code is correct.
 
 Evidence: `tools/check_weight_tails.py` (LOG.md "beta correction" entry has the full stdout).
+
+**Consequence: why T7 (parametric recovery) fails under a violated (R3).** T7 fits
+θ(y)=a·(−logΦ(βy))+b by full-batch L-BFGS and asserts |â−1|<0.02. Its survey-side term is
+(1/n)Σᵢ e^{a·θ*(yᵢ)+...}, which at the truth a=1 is the sample mean of w=e^{θ*(Y)}; the
+SAMPLING VARIANCE of that sample mean is Var_S[w] = E_S[w²]−E_S[w]², finite iff βσ<1 (tail
+index a>2 — the k=2 case above). At β=1.5, a=1.444≤2: this variance is infinite (§A's k=2
+column diverges as the integration range grows for β=1.5, converges for β=0.6/0.8). A sample
+mean of a heavy-tailed, right-skewed positive variable is typically BELOW its true expectation
+in any one finite sample (the rare huge draws that would pull it up are usually absent), so the
+survey term's exponential penalty on a moving away from 1 is under-felt, and L-BFGS settles at
+an â slightly ABOVE 1 for a typical sample. This is exactly what CP2 observed (â=1.0255 at
+β=1.5, notes/decisions.md) — a SYMPTOM of this same (R3) violation, not an independent
+training/optimisation bug — and it is why T7 passes at β=0.6 (`python -m pytest`: 0 failed,
+LOG.md "beta correction") without any change to T7's own code: the mechanism, not the fit,
+changed.
+Reference numbers from a separate sandbox on this same fusion_numpy.py (n=30000/cell, 3 seeds,
+BFGS; **NOT evidence for this repo** — reproduce with a tools/ script if wanted in-repo):
+β=0.6: â=0.9927,0.9824,1.0006 (mean 0.9919, sd 0.0074), max|α̂−α*| 0.006–0.009, 3/3 pass;
+β=1.5: â=1.0310,1.0106,1.0299 (mean 1.0238, sd 0.0094), max|α̂−α*| 0.017–0.082, 2/3 FAIL —
+consistently biased upward at β=1.5, matching the mechanism above.
+
+**Measured decay rate (this repo's own evidence).** From `check_weight_tails.py` §B at β=1.5
+(a=1.444, so the k=2 column above already shows infinite weight variance): bias(n) := (n·bias)/n
+= 13.98/80=0.1748, 30.86/320=0.0964, 83.27/1280=0.0651 at n=80,320,1280. Each ×4 increase in n
+shrinks the bias by a factor 0.1748/0.0964=1.812 then 0.0964/0.0651=1.482, giving empirical
+exponents log₄(1.812)=0.429 and log₄(1.482)=0.284 (bias ∝ n^{-0.429} then n^{-0.284}). §G's
+stable-law prediction is n^{-(1-1/a)} = n^{-(1-1/1.444)} = n^{-0.308} — the two empirical
+exponents bracket this prediction, consistent with it given the run's own Monte-Carlo noise
+(MC SE on n·bias was 0.83, 2.87, 8.50 at n=80,320,1280 respectively — non-trivial next to the
+signal, especially at n=1280). Finite third moment (a>3, e.g. β=0.6) would instead give the
+ordinary n^{-1} rate.

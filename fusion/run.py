@@ -224,7 +224,24 @@ def phase4_run(cfg: Config):
     saved.append(_save_with_config(fig, "phase4_stress3_small_n", cfg))
     plt.close(fig)
 
-    return {"in_sample": in_sample, "st1": st1, "st2": st2, "st3": st3, "saved": saved}
+    # Stress test 4 (2026-09-18, A3(c)): violate (R3) on purpose, probit selection, beta*sigma>=1
+    st4 = evaluate.stress_test_violate_r3(cfg)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    ax1.bar(["n_eff/n\nmean"], [st4["n_eff_mean"]], yerr=[st4["n_eff_sd"]], capsize=5)
+    ax1.set_ylim(0, 1)
+    ax1.set_title(f"n_eff/n over 10 seeds\nCV={st4['n_eff_cv']:.2f} (>=0.20 signature)", fontsize=9)
+    ns4 = list(st4["ns"])
+    ax2.loglog(ns4, [abs(b) for b in st4["biases"]], marker="o", label="observed |bias(n)|")
+    ref4 = abs(st4["biases"][0]) * (np.array(ns4) / ns4[0]) ** (-st4["predicted_exponent"])
+    ax2.loglog(ns4, ref4, linestyle="--", label=f"n^-{st4['predicted_exponent']:.3f} (SS G prediction)")
+    ax2.set_xlabel("n"); ax2.set_ylabel("|bias(n)|"); ax2.legend(fontsize=7)
+    ax2.set_title(f"delta-SE/MC-sd ratio={st4['se_ratio']:.2f} (signature: far from 1)", fontsize=9)
+    fig.suptitle(f"Stress 4: violate (R3) on purpose (beta={st4['beta']}, a={st4['a']:.2f})", y=1.04)
+    fig.tight_layout()
+    saved.append(_save_with_config(fig, "phase4_stress4_violate_r3", cfg))
+    plt.close(fig)
+
+    return {"in_sample": in_sample, "st1": st1, "st2": st2, "st3": st3, "st4": st4, "saved": saved}
 
 
 def main():
@@ -265,6 +282,15 @@ def main():
         print("stress 3 (small n):")
         for r in out["st3"]:
             print(f"  n={r['n']}: sd(mu_tilde)={r['sd_mu_tilde']:.4f} mean_n_eff={r['mean_n_eff']:.1f}")
+        st4 = out["st4"]
+        print(f"stress 4 (violate R3 on purpose: beta={st4['beta']}, a={st4['a']:.3f}):")
+        print(f"  n_eff/n over 10 seeds: mean={st4['n_eff_mean']:.3f} sd={st4['n_eff_sd']:.3f} "
+              f"CV={st4['n_eff_cv']:.3f} (signature: CV>=0.20-ish)")
+        print(f"  delta_SE={st4['delta_se']:.4f} MC_sd={st4['mc_sd']:.4f} ratio={st4['se_ratio']:.2f} "
+              f"(signature: far from 1)")
+        print(f"  bias(n) at n={st4['ns']}: {[round(b, 4) for b in st4['biases']]}")
+        print(f"  fitted decay exponents: {[round(e, 3) for e in st4['exponents']]} "
+              f"vs predicted n^-{st4['predicted_exponent']:.3f} (signature: < 1, the finite-moment rate)")
         for path in out["saved"]:
             print("saved:", path)
     elif args.phase == 5:

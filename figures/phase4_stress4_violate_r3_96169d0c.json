@@ -1,10 +1,11 @@
 {
-  "commit": "fa7af72",
+  "commit": "a350bbd",
   "config": {
     "H": 32,
     "M": 9,
+    "allow_heavy_tails": false,
     "batch": 256,
-    "beta": 1.5,
+    "beta": 0.6,
     "c_t_intercept": 0.9,
     "c_t_slope": -0.06,
     "epochs": 400,
@@ -20,5 +21,5 @@
     "val_frac": 0.2,
     "wd": 1e-05
   },
-  "figure": "phase3_val_curve_8e4fef38"
+  "figure": "phase4_stress4_violate_r3_96169d0c"
 }

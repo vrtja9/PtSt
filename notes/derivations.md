@@ -212,8 +212,8 @@ violating the offset baseline's constant-bias assumption — by DGP design, docs
 correction): `μ̃(t)` tracks `μ(t)` reasonably (e.g. t=6: 1.000 vs 1.000 exactly; t=5: 0.749 vs
 0.750), confirming the estimator isn't just "getting lucky" on the extrapolation years.
 
-**Stress 1 — Assumption 1 broken** (`π_t(y)=σ(a_t+b_t y)`, `b_t=β+0.1(t−m)`, t>m only). Math
-predicts (docs/math_fixed.md §E.1): "expect μ̃ bias growing with `|b_t−b_m|`." **Observed**
+**Stress 1 — Assumption 1 broken** (original text, β=1.5 era, `b_t=β+0.1(t−m)`). Math predicts
+(docs/math_fixed.md §E.1): "expect μ̃ bias growing with `|b_t−b_m|`." **Observed**
 (`figures/phase4_stress1_assumption1_*.png`): bias is negative throughout (μ̃ underestimates μ)
 but its MAGNITUDE SHRINKS as `|b_t−β|` grows: `-0.303, -0.295, -0.127` at drift `0.10, 0.20, 0.30`
 — the opposite of the qualitative prediction. Not treated as a bug (the estimator, trained under
@@ -223,6 +223,30 @@ selection model — and this specific perturbation also grows the shared interce
 that coupling is a specific, disclosed modelling choice for this stress test, not part of
 docs/math_fixed.md's own construction), but reported exactly as observed per the Honesty Oath
 rather than smoothed into agreement with the predicted direction.
+
+**CORRECTED 2026-09-18 (A3(a)):** the baseline `b_t=β+0.1(t−m)` above confounded changing the
+selection FORM (probit→logistic) with also changing its STRENGTH (since β itself changed from
+1.5→0.6 in the beta correction) — this may be part of why the trend above looked non-monotonic.
+Fixed baseline: `b_t = LOGISTIC_BASELINE_B + 0.1(t−m)`, `LOGISTIC_BASELINE_B=1.0` (chosen to match
+the default probit DGP's strength at t=m via Φ(x)≈σ(1.702x), not its literal β; see
+docs/math_fixed.md §E.1's caveat that this stress test tests Assumption 1 ONLY, never (R3) — a
+logistic weight has every moment finite against a Gaussian for any b). Re-run
+(`python -m fusion.run --phase 4`, config hash `96169d0c`): bias `-0.052, -0.140, -0.140` at
+drift `0.10, 0.20, 0.30` — magnitude now grows then plateaus, still not strictly monotonic
+between t=8,9 but a cleaner trend than before. Numbers in this whole "Phase 4 evidence" section
+predate the beta correction generally; LOG.md's "Phase 4" and "beta correction" entries hold the
+canonical current values for stress 2 and 3.
+
+**Stress 4 — violate (R3) on purpose (2026-09-18, A3(c), new).** `Config(beta=1.5,
+allow_heavy_tails=True)`, probit selection (the default family, not stress 1's logistic), oracle
+θ*. Checks §G's diagnostic signature directly. **Observed**
+(`figures/phase4_stress4_violate_r3_*.png`, `fusion.evaluate.stress_test_violate_r3`): n_eff/n
+over 10 seeds mean=0.122, sd=0.096, **CV=0.790** (signature: ≥0.20-ish, confirmed); delta-method
+SE=0.5189 vs Monte-Carlo sd=0.2086, **ratio=2.49** (signature: far from 1, confirmed); bias(n) at
+n=80,320,1280 gives fitted decay exponents 0.429 then 0.284 against §G's predicted stable-law
+rate n^{-(1-1/a)}=n^{-0.308} for a=1.444 (signature: below the finite-moment n^{-1} rate,
+confirmed, and bracketing the prediction). All three numbers match `check_weight_tails.py`'s β=1.5
+rows exactly (same seeds/algorithm), which is expected: both compute the same oracle quantities.
 
 **Stress 2 — support shift** (`m_t`+2σ, t>m only). Math predicts (§E.2): report the fraction of
 t>m survey values outside the training range. **Observed**

@@ -1,7 +1,7 @@
 .PHONY: test figures slides evidence
 
 test:
-	pytest -q
+	python -m pytest -q -s
 
 figures:
 	python -m fusion.run --phase 1

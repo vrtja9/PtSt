@@ -65,6 +65,9 @@ challenge's loss (2); the estimate is the self-normalised weighted survey mean
 - Commit at the end of each phase: `git add -A && git commit -m "phase k: <what>"`; show the hash.
 - Never run a command expected to take > 2 minutes without saying so first; prefer smaller n.
 - Keep `LOG.md`: one block per run (config hash, command, key printed lines).
+- Tests run as `python -m pytest -q -s`. The bare `pytest` on PATH is a separate uv-tool-installed
+  interpreter without the project's dependencies; a root conftest.py fixes sys.path but cannot
+  fix a different interpreter.
 
 ### 2.5 Checkpoints — stop, ask in ≤ 5 lines with a default, wait
 - CP0 after environment setup (show `python -c "import torch,numpy,scipy"` output).
