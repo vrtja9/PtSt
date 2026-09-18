@@ -21,11 +21,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import json
 import math
+import re
 import subprocess
 import time
 
 import numpy as np
 import torch
+from scipy.integrate import quad
 from scipy.stats import norm
 
 import fusion_numpy as npref
@@ -111,6 +113,24 @@ def _t4_agreement() -> dict:
     return {"r_diff": r_diff, "L_diff": L_diff, "worst_grad_diff": max(grad_diffs)}
 
 
+def _t11d_predicted_n_bias(cfg: Config) -> float:
+    """Mirrors tests/test_t11_weight_tails.py::test_T11d_finite_sample_bias_report_only's
+    predicted-constant computation at t=1 (oracle theta*, numerical integration, no training):
+    -E_S[w^2(Y-mu)]/E_S[w]^2."""
+    mu = float(dgp.m_t(cfg, 1))
+    am, a1 = dgp.a_t(cfg, cfg.m), dgp.a_t(cfg, 1)
+
+    def wf(y):
+        return norm.cdf(am) / max(norm.cdf(cfg.beta * y), 1e-300)
+
+    def sf(y):
+        return norm.cdf(cfg.beta * y) * norm.pdf(y, mu, cfg.sigma) / norm.cdf(a1)
+
+    Ew = quad(lambda y: wf(y) * sf(y), -30, 30, limit=400)[0]
+    Ew2 = quad(lambda y: wf(y) ** 2 * (y - mu) * sf(y), -30, 30, limit=400)[0]
+    return float(-Ew2 / Ew ** 2)
+
+
 def _t11_at(cfg: Config, n_boot: int = 200) -> dict:
     """T11(a)-(c)'s numbers (oracle theta*, no training) at an arbitrary cfg -- used for both the
     current default and, via a heavy-tailed cfg, the old beta=1.5 contrast (slide 3 learning 2)."""
@@ -167,6 +187,7 @@ def collect() -> dict:
     t4 = _t4_agreement()
     t7_a_hat = _t7_a_hat(Config(n=200_000))
     t11_default = _t11_at(cfg)
+    t11d_predicted = _t11d_predicted_n_bias(cfg)
 
     t0 = time.time()
     proc = subprocess.run(["python3", "-m", "pytest", "-q", "tests/"], cwd=str(REPO_ROOT),
@@ -176,6 +197,37 @@ def collect() -> dict:
     if proc.returncode != 0:
         raise RuntimeError(f"build_deck: pytest failed, refusing to claim tests pass:\n{proc.stdout[-2000:]}")
 
+    m_summary = re.search(r"(\d+) passed in ([\d.]+)s", pytest_summary)
+    if not m_summary:
+        raise RuntimeError(f"build_deck: could not parse pytest summary line: {pytest_summary!r}")
+    pytest_passed = int(m_summary.group(1))
+    pytest_time_s = float(m_summary.group(2))
+
+    # Per-test names+values (slide 2's "Tests" section), built here rather than typed into the
+    # renderer, per the HARD RULE -- render_slides.py only groups and joins these.
+    tests_info = [
+        {"id": "T1", "group": "DGP", "desc": "closed forms vs MC"},
+        {"id": "T2", "group": "DGP", "desc": "kept-sample law vs quadrature"},
+        {"id": "T3", "group": "DGP", "desc": "w(y,y') constant in t"},
+        {"id": "T4", "group": "Loss/gradients",
+         "desc": f"torch vs hand-derived numpy backward: loss {t4['L_diff']:.1e}, grad {t4['worst_grad_diff']:.1e}"},
+        {"id": "T5", "group": "Loss/gradients", "desc": "autograd gradcheck (float64)"},
+        {"id": "T6", "group": "Loss/gradients", "desc": "joint convexity in (theta,a)"},
+        {"id": "T7", "group": "Loss/gradients", "desc": f"parametric recovery a_hat = {t7_a_hat:.4f}"},
+        {"id": "T8", "group": "Loss/gradients", "desc": "alpha[m] = 0"},
+        {"id": "T9", "group": "Estimator", "desc": "oracle mu~ vs mu within 3 SE"},
+        {"id": "T10", "group": "Estimator", "desc": "trained mu~ vs oracle"},
+        {"id": "T11a", "group": "Weights", "desc": f"kappa = {t11_default['kappa']:.2f} > 3"},
+        {"id": "T11b", "group": "Weights", "desc": f"n_eff CV = {t11_default['n_eff_cv']:.3f} < 0.20"},
+        {"id": "T11c", "group": "Weights", "desc": f"SE/sd = {t11_default['se_ratio']:.2f} in [0.75,1.33]"},
+        {"id": "T11d", "group": "Weights", "desc": f"n*bias -> {t11d_predicted:.3f}"},
+    ]
+    if pytest_passed != len(tests_info):
+        raise RuntimeError(
+            f"build_deck: pytest reports {pytest_passed} passed but tests_info lists "
+            f"{len(tests_info)} entries -- update tests_info in build_deck.py to match tests/"
+        )
+
     data["slide2"] = {
         "rows_total": 2 * cfg.m * cfg.n,
         "H": cfg.H, "lr": cfg.lr, "wd": cfg.wd, "batch": cfg.batch, "epochs": cfg.epochs,
@@ -183,6 +235,8 @@ def collect() -> dict:
         "foc": {str(k): v for k, v in foc.items()},
         "t4": t4, "t7_a_hat": t7_a_hat, "t11_kappa": t11_default["kappa"],
         "t11_n_eff_cv": t11_default["n_eff_cv"], "t11_se_ratio": t11_default["se_ratio"],
+        "t11d_predicted_n_bias": t11d_predicted,
+        "tests": tests_info, "pytest_passed": pytest_passed, "pytest_time_s": pytest_time_s,
         "pytest_summary": pytest_summary, "pytest_runtime_s": pytest_runtime,
         "figure_val_curve": "phase3_val_curve_96169d0c.png",
         "figure_alpha": "phase3_alpha_hat_vs_star_96169d0c.png",

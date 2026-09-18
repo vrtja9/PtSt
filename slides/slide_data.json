@@ -54,8 +54,10 @@
       "6": 0.9685837798399286
     },
     "lr": 0.001,
-    "pytest_runtime_s": 42.52442812919617,
-    "pytest_summary": "14 passed in 41.68s",
+    "pytest_passed": 14,
+    "pytest_runtime_s": 71.09199237823486,
+    "pytest_summary": "14 passed in 66.10s (0:01:06)",
+    "pytest_time_s": 66.1,
     "r_hat_unbounded": {
       "0": 0.5,
       "1": -0.31606027941427883,
@@ -67,12 +69,85 @@
     "t11_kappa": 3.7777777777777777,
     "t11_n_eff_cv": 0.04785393540700559,
     "t11_se_ratio": 0.9851376250723487,
+    "t11d_predicted_n_bias": 1.084340749684836,
     "t4": {
       "L_diff": 5.551115123125783e-17,
       "r_diff": 1.1102230246251565e-16,
       "worst_grad_diff": 6.938893903907228e-17
     },
     "t7_a_hat": 1.0063382559329457,
+    "tests": [
+      {
+        "desc": "closed forms vs MC",
+        "group": "DGP",
+        "id": "T1"
+      },
+      {
+        "desc": "kept-sample law vs quadrature",
+        "group": "DGP",
+        "id": "T2"
+      },
+      {
+        "desc": "w(y,y') constant in t",
+        "group": "DGP",
+        "id": "T3"
+      },
+      {
+        "desc": "torch vs hand-derived numpy backward: loss 5.6e-17, grad 6.9e-17",
+        "group": "Loss/gradients",
+        "id": "T4"
+      },
+      {
+        "desc": "autograd gradcheck (float64)",
+        "group": "Loss/gradients",
+        "id": "T5"
+      },
+      {
+        "desc": "joint convexity in (theta,a)",
+        "group": "Loss/gradients",
+        "id": "T6"
+      },
+      {
+        "desc": "parametric recovery a_hat = 1.0063",
+        "group": "Loss/gradients",
+        "id": "T7"
+      },
+      {
+        "desc": "alpha[m] = 0",
+        "group": "Loss/gradients",
+        "id": "T8"
+      },
+      {
+        "desc": "oracle mu~ vs mu within 3 SE",
+        "group": "Estimator",
+        "id": "T9"
+      },
+      {
+        "desc": "trained mu~ vs oracle",
+        "group": "Estimator",
+        "id": "T10"
+      },
+      {
+        "desc": "kappa = 3.78 > 3",
+        "group": "Weights",
+        "id": "T11a"
+      },
+      {
+        "desc": "n_eff CV = 0.048 < 0.20",
+        "group": "Weights",
+        "id": "T11b"
+      },
+      {
+        "desc": "SE/sd = 0.99 in [0.75,1.33]",
+        "group": "Weights",
+        "id": "T11c"
+      },
+      {
+        "desc": "n*bias -> 1.084",
+        "group": "Weights",
+        "id": "T11d"
+      }
+    ],
     "wd": 1e-05
   },
   "slide3": {

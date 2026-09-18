@@ -330,3 +330,33 @@ exactly where directly comparable.
   well above the slide's bottom edge), headline and parenthetical both render with the live
   numbers above.
 - `python -m pytest -q`: 14 passed in 42.77s.
+
+## Deck review round 4 -- slide 2/3 stripped to symbols, values, identities (2026-09-18)
+- Added to fusion/build_deck.py: `_t11d_predicted_n_bias(cfg)` (mirrors
+  tests/test_t11_weight_tails.py::test_T11d_finite_sample_bias_report_only's numerical-integration
+  formula -Ew2/Ew^2 at t=1) -> 1.084340749684836 (matches the test's own printed "predicted n*bias
+  = 1.084" from an earlier pytest run). Added a `tests` list of 14 {id, group, desc} dicts (T1..T11d,
+  descriptions/values built in build_deck.py, not typed into the renderer) and parsed
+  `pytest_passed`/`pytest_time_s` from the pytest summary line via regex, asserting
+  pytest_passed == len(tests) (fail loudly if they drift apart).
+- Rewrote fusion/render_slides.py's slide 2 and slide 3 content to the user-supplied trimmed,
+  symbol-heavy text (Unicode Greek/math operators, ## section headers, **bold** inline spans --
+  added `_add_bullet_paragraph` support for both to build_pptx). Slide 1 left unchanged. Both
+  slides now render at font_size=10 (previously 11 and 9 respectively).
+- Verified combining-diacritic glyphs (θ̃, μ̃, α̃, R̂) render cleanly through this soffice/pptx
+  pipeline via a throwaway test slide before committing to them across the real deck.
+- `python3 fusion/build_deck.py` (139.5s, slower than the usual ~78-85s -- system load, not a
+  code change) -> slides/slide_data.json. `python3 -m fusion.render_slides` -> slides/deck.pptx,
+  slides/deck.md.
+- Rendered to PDF/PNG and opened all 3 slides: no overflow on slide 2 or slide 3 at 10pt (both
+  end with visible whitespace below the last bullet); all Unicode symbols (θ α β μ κ Σ φ 𝒜 ℝ ✓ ✗
+  θ̃ μ̃ α̃ R̂) render with no missing-glyph boxes; bold headers and inline bold spans render
+  correctly.
+- New live numbers appearing on the rebuilt slides: T11d predicted n*bias 1.084 (slide 2 Weights
+  line and slide 3's L2 table); ablation table's derived "band 2<y<=3 = 54%" line (=
+  contribution_pct(c=2) - contribution_pct(c=3) = 92% - 38%, computed at render time from already-
+  live counterfactual fields, not a new build_deck.py field). Table numbers, decomposition,
+  covariate-shift ratios, T7/T11a-c values are the same live figures as round 3 (rows_total=24000,
+  best_val_loss=0.4481 @ epoch 140/400, T4 diffs 5.6e-17/6.9e-17, kappa=3.78/1.44, etc.) --
+  unchanged in value, only in presentation (grouped test lines, tables instead of prose).
+- `python -m pytest -q`: 14 passed in 65.28s.
