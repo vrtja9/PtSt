@@ -305,3 +305,28 @@ exactly where directly comparable.
   attribution/counterfactual/covariate-shift findings above) and notes/talk_through.md (items
   11-12 and the Q&A section, adding a two-part sampling+covariate-shift answer to "why does mu~
   undershoot at t=9").
+
+## Deck review round 3 -- headline-sentence fix, counterfactual item closed (2026-09-18)
+- Fixed Learning 3's headline bullet in fusion/render_slides.py: the old closing sentence
+  ("sampling variability, not model error, explains most of the other gaps") conflated
+  significance (0.7 SE at t=7,8) with attribution (false at t=8, where model=-0.0184 is ~10x
+  sampling=+0.0019). New sentence, generated from slide_data.json: "the model-drift term is
+  present at every forecast year and grows monotonically (-0.0097, -0.0184, -0.0253); the
+  sampling term is what swings in sign and size (+0.0250, +0.0019, -0.0409). Only at t=9 do the
+  two align and push mu~-mu past 2 SE." Checked notes/talk_through.md for the same conflation --
+  not present (its round-2 Q&A already kept significance and attribution separate).
+- Closed (not left open) the counterfactual reproducibility item from round 2: user's reference
+  (-0.0375, y>3 30%, y>2 76%) was from an earlier model checkpoint (pre-retrain, per the M2
+  re-derivation); current numbers supersede it. Cross-check: 200-rep ablation mean -0.0286 (sd
+  0.0018) vs table's single-sample mu_tilde_minus_oracle at t=9 -0.0253 -- diff 0.00326, i.e.
+  1.77 sd apart (`python3 -c` one-liner against slide_data.json), consistent with normal sampling
+  variability between a 200-rep average and one realized draw. No re-run performed to chase the
+  old number. See notes/decisions.md "Deck review round 3" entry for full reasoning.
+- Added the optional parenthetical to slide 3's mechanism bullet: "(-0.0286 is the 200-rep
+  ablation mean; -0.0253 is this sample's realisation, 1.8 sd apart)".
+- `python3 fusion/build_deck.py` (78.2s) -> slides/slide_data.json; `python3 -m
+  fusion.render_slides` -> slides/deck.pptx, slides/deck.md.
+- Rendered to PDF/PNG (soffice + pdftoppm) and opened slide 3: fits without overflow (text ends
+  well above the slide's bottom edge), headline and parenthetical both render with the live
+  numbers above.
+- `python -m pytest -q`: 14 passed in 42.77s.

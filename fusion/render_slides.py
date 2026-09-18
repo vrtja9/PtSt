@@ -119,6 +119,8 @@ def _build_slides(d: dict) -> list[dict]:
     headline_str = ", ".join(f"t={r['t']}:{100*r['bias_reduction_pct']:.0f}%" for r in table_rows)
     band_23_s9 = cs2["s9"] - cs3["s9"]
     mo_seq = ", ".join(f"{r['mu_tilde_minus_oracle']:+.4f}" for r in table_rows)
+    sampling_seq = ", ".join(f"{r['oracle_minus_mu']:+.4f}" for r in table_rows)
+    cf_diff_sd = abs(cf_full["mean"] - row_last["mu_tilde_minus_oracle"]) / cf_full["sd"]
 
     slide3_bullets = [
         "\n".join(table_lines),
@@ -133,8 +135,10 @@ def _build_slides(d: dict) -> list[dict]:
         f"(fails |a-1|<0.02). beta={s1['beta']}: kappa={l2b['kappa']:.2f}, CV={l2b['cv']:.3f}, "
         f"SE ratio={l2b['se_ratio']:.2f}, T7 a_hat={l2b['t7_a_hat']:.4f} (passes). One defect, not four",
         f"Learning 3 (headline): mu~ cuts the survey's bias vs mu(t) by {headline_str} -- "
-        f"decomposition mu~-mu=(oracle-mu)+(mu~-oracle): {decomp_str}; only t={sig_ts} exceeds "
-        f"2 SE -- sampling variability, not model error, explains most of the other gaps",
+        f"decomposition mu~-mu=(oracle-mu)+(mu~-oracle): {decomp_str}; the model-drift term is "
+        f"present at every forecast year and grows monotonically ({mo_seq}); the sampling term is "
+        f"what swings in sign and size ({sampling_seq}). Only at t={sig_ts} do the two align and "
+        f"push mu~-mu past 2 SE",
         f"Learning 3 (mechanism, not circular): hold theta~'s drift delta(y):=theta~(y)-theta*(y) "
         f"FLAT beyond a cutoff c (delta(min(y,c))), paired on the same S_{s1['M']} draws -- an "
         f"ablation of the trained net's own output, not a re-interpolation of it. Full drift shift "
@@ -143,7 +147,9 @@ def _build_slides(d: dict) -> list[dict]:
         f"{cf_c2['mean']:+.4f} (y>2 contributes {100*cf_c2['contribution_pct']:.0f}%) -- at "
         f"t={s1['M']}, {row_last['mu_tilde_minus_oracle']:+.4f} of the "
         f"{row_last['mu_tilde_minus_mu']:+.4f} total gap ({100*drift_share_last:.0f}%) is this "
-        f"model-drift term, the rest is sampling",
+        f"model-drift term, the rest is sampling ({cf_full['mean']:+.4f} is the 200-rep ablation "
+        f"mean; {row_last['mu_tilde_minus_oracle']:+.4f} is this sample's realisation, "
+        f"{cf_diff_sd:.1f} sd apart)",
         f"Learning 3 (diagnosis): the far tail y>3 is {cs3['s9']:.1%} of S_{s1['M']}'s mass but "
         f"contributes only {100*cf_c3['contribution_pct']:.0f}% of the shift; the 2<y<=3 band "
         f"({band_23_s9:.1%} of mass) dominates -- that band is data-RICH at t={s1['M']} but "

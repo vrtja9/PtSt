@@ -237,11 +237,45 @@ slide 2. Four fixes, applied in this pass:
    share at 62%; covariate shift explains the smaller, model-attributable 38%) instead of the
    previous one-part ("θ̃ drift alone explains it") answer.
 
-**Reproducibility note.** The user's own reference numbers for the counterfactual repair (full
-drift `-0.0375`; y>3 contributes 30%; y>2 contributes 76%) were flagged by the user as "model
-retrained since" and did NOT reproduce exactly on this pass's fresh training run (measured:
-full drift `-0.0286`; y>3 contributes 38%; y>2 contributes 92% — same qualitative finding, the
-near-tail band dominates over the far tail, just a different split). The decomposition,
-bias-reduction percentages, and covariate-shift mass-share ratios all matched the user's
-reference numbers closely (within Monte Carlo noise). Per the HARD RULE, the live numbers from
-this run — not the stale reference — are what the rebuilt slide/docs quote.
+**Reproducibility note — CLOSED (2026-09-18, see the round-3 entry below for the closing
+reasoning).** The user's own reference numbers for the counterfactual repair (full drift
+`-0.0375`; y>3 contributes 30%; y>2 contributes 76%) did not reproduce exactly on this pass's
+fresh training run (measured: full drift `-0.0286`; y>3 contributes 38%; y>2 contributes 92% —
+same qualitative finding, the near-tail band dominates over the far tail, just a different
+split). The decomposition, bias-reduction percentages, and covariate-shift mass-share ratios all
+matched the user's reference numbers closely (within Monte Carlo noise). Per the HARD RULE, the
+live numbers from this run — not the stale reference — are what the rebuilt slide/docs quote.
+
+## Deck review round 3 — headline-sentence fix, counterfactual item closed (2026-09-18)
+User confirmed the deck; one wording error, one open item, one optional clause:
+
+1. **Fixed**: Learning 3's headline bullet closed with "sampling variability, not model error,
+   explains most of the other gaps," which conflates "within 0.7 SE of zero" (a statement about
+   *significance*, true at t=7,8) with "mostly sampling" (an *attribution* claim, false at t=8:
+   the table's own row gives sampling `+0.0019` vs model `-0.0184` — the model term is ~10x the
+   sampling term there). Replaced with the decomposition read the right way round: the
+   model-drift term (`mu_tilde_minus_oracle`) is present at every forecast year and grows
+   monotonically (`-0.0097, -0.0184, -0.0253`); the sampling term (`oracle_minus_mu`) is what
+   swings in sign and size (`+0.0250, +0.0019, -0.0409`); only at t=9 do the two align in sign
+   and push `mu~-mu` past 2 SE. Generated in `fusion/render_slides.py` from `slide_data.json`'s
+   table rows, not typed. Checked `notes/talk_through.md` for the same conflation — its Q&A
+   section (added in round 2) already frames this correctly (significance vs. attribution kept
+   separate: "the same kind of gap is only 0.7 SE" is about the total gap, not a claim that
+   sampling explains the per-row model term) — no edit needed there.
+2. **Closed, not open**: the counterfactual "could not reproduce" item from round 2 is resolved.
+   The user's reference (`-0.0375`, y>3 30%, y>2 76%) was computed from the θ̃−θ* grid captured
+   during the M2 re-derivation — an earlier model checkpoint. The model has been retrained since
+   (current: best val loss `0.4481` at epoch 140), so a different drift function δ(y) is the
+   expected cause of the numeric difference, and the current numbers supersede the stale
+   reference rather than needing to chase it. The internal cross-check that validates the
+   *current* numbers: the 200-rep ablation gives full drift shift `-0.0286` (per-rep sd
+   `0.0018`), and the main table's single-sample `mu_tilde_minus_oracle` at t=9 gives `-0.0253`
+   — two independent routes to the same quantity (a 200-rep Monte Carlo average vs. one
+   realized survey draw), `1.77` sd apart, i.e. consistent under normal sampling variability.
+   No re-run was performed to chase the old reference number, per instruction.
+3. **Added (optional clause taken)**: slide 3's mechanism bullet now parenthetically
+   distinguishes the two numbers above where they appear two sentences apart — "(`-0.0286` is
+   the 200-rep ablation mean; `-0.0253` is this sample's realisation, `1.8` sd apart)" — so the
+   cross-check in point 2 is visible on the slide itself, not just in this log. Whether it still
+   fits without overflow was checked by re-rendering the deck to PNG after this edit (see LOG.md,
+   this date's entry, for the outcome).

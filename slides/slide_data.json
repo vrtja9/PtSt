@@ -54,8 +54,8 @@
       "6": 0.9685837798399286
     },
     "lr": 0.001,
-    "pytest_runtime_s": 41.33490443229675,
-    "pytest_summary": "14 passed in 40.49s",
+    "pytest_runtime_s": 42.52442812919617,
+    "pytest_summary": "14 passed in 41.68s",
     "r_hat_unbounded": {
       "0": 0.5,
       "1": -0.31606027941427883,
