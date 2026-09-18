@@ -140,9 +140,31 @@ error, since n_eff/n=0.93-0.96), verified to fully account for μ̃(9)'s gap via
 θ̃−θ* drift (LOG.md has the numbers), and that `cfg.theta_bounded=20` never binds over the
 training range — recorded, not changed, so slide 3 doesn't overclaim what the CP3 fix did.
 
-## Known stale: Phase 5 slides reference beta=1.5-era content (2026-09-18)
-Not edited in this pass (explicitly out of scope; user said "decide and report, do not act").
-**3 of 3 slides are affected.** Checklist for the eventual Phase 5 rebuild
+## Deck rebuild under the HARD RULE (2026-09-18)
+User's HARD RULE: every number on a slide is read programmatically from the repo at build time;
+no number is hand-typed into the build script; the build fails loudly if a value is missing.
+Implemented as two scripts: `fusion/build_deck.py` (`collect()`) re-runs the live pipeline --
+trains a fresh model, re-derives T4's numpy-twin agreement and T7's L-BFGS fit (at both the
+current default and, via `allow_heavy_tails=True`, the old β=1.5 for the slide-3 contrast), runs
+the full `pytest` suite as a subprocess to get a real "N passed" string, and computes the
+C4(a)-style implied-shift/mass-share numbers -- and writes everything to `slides/slide_data.json`
+(the "results table" the HARD RULE allows). `fusion/render_slides.py` then only interpolates
+`slide_data.json`'s fields into static bullet prose via f-strings; the only hand-written numeric
+literal anywhere is `math.sqrt(2)` inside the (R3) rule's prose, itself computed, not typed as a
+decimal. `fusion/run.py --phase 5` (hence `make slides`) was updated to call both in sequence,
+since the old phase-5 code called `render_slides`'s old zero-argument functions, which no longer
+exist -- verified by an end-to-end re-run (75-79s, dominated by the fresh training run + T7 x2 +
+the full pytest subprocess). All three slides re-rendered to PNG and opened; content confirmed
+legible and numbers cross-checked against LOG.md's independently-computed values (exact matches
+on every deterministic-seed quantity: FOC, T7 a_hat at both β's, T11 numbers, θ* bounds).
+
+## Known stale: Phase 5 slides reference beta=1.5-era content (2026-09-18) -- RESOLVED below
+At the time this was written, not edited (explicitly out of scope; user said "decide and report,
+do not act"). Superseded by the same day's deck rebuild (see "Deck rebuild" entry below): all 3
+slides were rebuilt from `slides/slide_data.json`, sourced live from the repo, so every number
+named in the checklist below is now current. Left as the historical record of what was stale and
+why, not deleted.
+**3 of 3 slides were affected.** Checklist that guided the rebuild
 (`fusion/render_slides.py`'s `SLIDES` list, `slides/deck.pptx`, `slides/deck.md`):
 - **Slide 1** ("The data-generating process"): text bullet "beta=1.5" is wrong (now 0.6); text
   bullet "shrinks from ~0.78 (t=1) to ~0.12 (t=9)" is wrong (now ≈0.45/≈0.17, docs/math_fixed.md

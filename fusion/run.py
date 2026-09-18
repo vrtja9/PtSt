@@ -294,14 +294,24 @@ def main():
         for path in out["saved"]:
             print("saved:", path)
     elif args.phase == 5:
-        from fusion.render_slides import SLIDES_DIR, build_markdown_fallback, build_pptx
+        import json as _json
         import os as _os
 
+        from fusion import build_deck
+        from fusion.render_slides import SLIDES_DIR, SLIDE_DATA_PATH, _build_slides, build_markdown_fallback, build_pptx
+
         _os.makedirs(SLIDES_DIR, exist_ok=True)
+        print("Collecting slide data (trains a model, runs T7 x2, runs the full pytest suite -- this takes a while)...")
+        data = build_deck.collect()
+        with open(SLIDE_DATA_PATH, "w") as f:
+            _json.dump(data, f, indent=2, sort_keys=True)
+        print("saved:", SLIDE_DATA_PATH)
+
+        slides_spec = _build_slides(data)
         pptx_path = _os.path.join(SLIDES_DIR, "deck.pptx")
         md_path = _os.path.join(SLIDES_DIR, "deck.md")
-        build_pptx(pptx_path)
-        build_markdown_fallback(md_path)
+        build_pptx(pptx_path, slides_spec)
+        build_markdown_fallback(md_path, slides_spec)
         print("saved:", pptx_path)
         print("saved:", md_path)
 

@@ -244,3 +244,29 @@ exactly where directly comparable.
   theta*(-3.868)=4.229, theta*(0)=0.332, theta*(4.982)=-0.360, log Phi(a_m)=-0.3616, strictly
   decreasing over a 2000-point grid on [-10,10]. cfg.theta_bounded=20 confirmed never binding
   (|theta*|<=4.23 over the training range).
+
+## Deck rebuild under the HARD RULE (2026-09-18)
+- `python fusion/build_deck.py` (75.0s, then re-verified via `python -m fusion.run --phase 5`,
+  78.7s, bit-identical output -- deterministic seeds): saved slides/slide_data.json.
+  slide1: tail_index_a=3.778, r3_holds=true, survey_bias_t1=+0.4535, survey_bias_tM=+0.1677.
+  slide2: best_val_loss=0.4481 at epoch 140/400, FOC={1:1.037,2:1.012,3:1.003,4:0.998,5:0.988,
+  6:0.969}, T4 L_diff=5.6e-17/worst_grad_diff=6.9e-17, T7 a_hat=1.0063, T11 a=3.778/CV=0.048/
+  SE_ratio=0.99, pytest_summary="14 passed in 39.73s" (subprocess, not hand-typed).
+  slide3 learning2 contrast (beta=0.6 vs live beta=1.5 via allow_heavy_tails=True): a=3.78 vs
+  1.44, CV=0.048 vs 0.790, SE_ratio=0.99 vs 2.49, T7 a_hat=1.0063 (pass) vs 1.0255 (fail) --
+  matches the historical CP2 value (1.0254527018521806) to full precision. learning3: mass
+  shares above y=3,4,5 = 0.1256/0.0149/0.0007 (this run's rng state; C4(a)'s standalone script
+  got 0.1273/0.0147/0.0008 from a different rng state -- both consistent, same order). implied
+  shift -0.02889 vs actual -0.02889 (300 reps of n=200, paired seeds) -- matches C4(a)'s finding.
+- `python -m fusion.render_slides` -> saved slides/deck.pptx, slides/deck.md (all numbers pulled
+  from slide_data.json via f-string interpolation, per the HARD RULE).
+- Rendered to PDF/PNG (soffice + pdftoppm, same toolchain as Phase 5) and opened all 3 slides
+  twice (once after an initial render, once after fixing a redundant timing display on slide 2
+  and again after the phase-5 fix): all legible, figures placed correctly, table and bullet
+  numbers match slide_data.json exactly.
+- Fixed fusion/run.py's `--phase 5` dispatch: it called fusion/render_slides.py's OLD zero-arg
+  `build_pptx`/`build_markdown_fallback`, which no longer exist after the rebuild (they now take
+  a `slides_spec` argument) -- would have crashed `make slides`. Now calls
+  `build_deck.collect()` then `render_slides._build_slides()` then both build functions, matching
+  the two-script design. Verified via a full re-run (`python -m fusion.run --phase 5`, 78.7s).
+- `python -m pytest -q tests/` (final check after all edits): 14 passed.
