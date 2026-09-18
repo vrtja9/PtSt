@@ -1,8 +1,14 @@
 """Evidence for docs/math_fixed.md §G: moments of the importance weight w = e^{theta*}.
-Run from the repo root:  python tools/check_weight_tails.py
+Run:  python tools/check_weight_tails.py   (from any cwd; the shim below puts the repo root on sys.path)
 C/C++ -> Python -> R: quad() is adaptive Gauss-Kronrod numerical integration (GSL's
 gsl_integration_qag in C; integrate() in R); the loops below are the same quantities
 obtained by Monte-Carlo sampling instead of quadrature."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root: fusion_numpy.py lives there
+# C/C++ -> Python -> R: the runtime equivalent of -I<repo> on the compiler's include path
+# (R: the .libPaths()/here::here() idiom).
+
 import warnings
 import numpy as np
 from scipy.stats import norm
@@ -76,6 +82,5 @@ for beta in (0.6, 1.5):
 
 print("== E. survey bias E_S[Y]-mu over t, at the proposed default beta=0.6 ==")
 F.CFG['beta'] = 0.6
-print("  " + "  ".join("t=%d:%+.3f" % (t, F.ESed_closed(t) - F.m_t(t)) if False else
-                       "t=%d:%+.3f" % (t, F.ES_closed(t) - F.m_t(t))
+print("  " + "  ".join("t=%d:%+.3f" % (t, F.ES_closed(t) - F.m_t(t))
                        for t in range(1, F.CFG['M'] + 1)))

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import subprocess
 from dataclasses import asdict, dataclass
 
@@ -34,7 +35,7 @@ class Config:
     M: int = 9                    # last year with survey (S_t) data, m < M
     n: int = 2000                 # i.i.d. draws per (t, z) cell
     sigma: float = 1.0            # P_{t,Y} = N(m_t, sigma^2)
-    beta: float = 1.5             # selection steepness in pi_t(y) = c_t * Phi(beta*y)
+    beta: float = 0.6             # selection steepness in pi_t(y) = c_t * Phi(beta*y); (R3): beta*sigma < 1/sqrt(2); tail index a = 3.78
     m_t_intercept: float = -0.5   # m_t(t) = m_t_intercept + m_t_slope * t
     m_t_slope: float = 0.25
     c_t_intercept: float = 0.9    # c_t(t) = c_t_intercept + c_t_slope * t, c_t in (0,1]
@@ -59,6 +60,25 @@ class Config:
     # re-drawing bootstrap samples or re-shuffling batches cannot silently perturb the DGP. ---
     seed_data: int = 0            # DGP draws, splits, bootstrap
     seed_model: int = 1           # parameter init, batch shuffling
+
+    # --- DECISION (2026-09-18, authorized correction to the frozen spec, docs/math_fixed.md §G):
+    # beta*sigma >= 1/sqrt(2) makes the importance weight's third moment infinite (R3), silently
+    # invalidating the delta-method SE and the Hajek estimator's O(1/n) bias expansion -- so it is
+    # rejected by default. allow_heavy_tails=True is the explicit opt-in for a deliberate
+    # heavy-tailed stress-test config; no existing code path (Phase 1-5) sets it, since none of
+    # them construct a Config with beta*sigma >= 1/sqrt(2). ---
+    allow_heavy_tails: bool = False
+
+    def __post_init__(self) -> None:
+        if self.beta * self.sigma >= 1 / math.sqrt(2) and not self.allow_heavy_tails:
+            a = 1 + 1 / (self.beta ** 2 * self.sigma ** 2)
+            raise ValueError(
+                f"beta*sigma={self.beta * self.sigma:.4f} >= 1/sqrt(2)~=0.7071 violates (R3): "
+                f"tail index a={a:.2f} <= 3, so the importance weight's third moment is infinite "
+                f"and the Hajek estimator's O(1/n) bias expansion does not apply "
+                f"(docs/math_fixed.md §G). Pass allow_heavy_tails=True for a deliberate "
+                f"heavy-tailed stress-test config."
+            )
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), indent=2, sort_keys=True)

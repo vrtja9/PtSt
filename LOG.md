@@ -93,3 +93,115 @@ One block per run: config hash, command, key printed lines.
   docs/math_fixed.md step numbers.
 - Final `python -m pytest tests/ -v` -> 1 failed (T7, documented at CP2, unchanged throughout),
   9 passed (T1,T2,T3,T4,T5,T6,T8,T9,T10).
+
+## Beta correction (2026-09-18): 1.5 -> 0.6 under rule (R3), authorized
+See notes/decisions.md "Authorized correction" for the full narrative and the theorem.
+STOP CONDITION encountered and resolved before any edit: `python tools/check_weight_tails.py`
+raised `ModuleNotFoundError: No module named 'fusion_numpy'` (script's own dir, not cwd, is
+sys.path[0] for a direct script invocation) -- reported and held for the user's answer; fixed by
+an in-file `sys.path` shim (their decision), same shim added to tools/twin_default_run.py.
+`conftest.py` (empty) added at repo root; verified it does NOT fix bare `pytest` in this
+container (that command uses a completely separate `uv tool`-installed interpreter with no
+project dependencies -- `pytest --version` 9.0.2 there vs 8.3.3 under `python -m pytest`,
+confirmed via the shebang `/root/.local/share/uv/tools/pytest/bin/python`); `python -m pytest`
+(or bare `pytest` in an environment where the `pytest` binary and `python3` share site-packages)
+remains the working invocation.
+
+`python tools/check_weight_tails.py` full stdout:
+```
+== A. E_S[w^k] integrals vs integration range (divergence = infinite moment) ==
+  beta=0.6  tail index a= 3.78  (a>2 finite var, a>3 finite 3rd moment)  L=10,20,40  k=2: ['3.21', '3.21', '3.21']   k=3: ['28.9', '28.9', '28.9']
+  beta=0.8  tail index a= 2.56  (a>2 finite var, a>3 finite 3rd moment)  L=10,20,40  k=2: ['5.86', '5.86', '5.86']   k=3: ['7.43e+08', '3.3e+28', 'nan']
+  beta=1.0  tail index a= 2.00  (a>2 finite var, a>3 finite 3rd moment)  L=10,20,40  k=2: ['307', '9.26e+03', '1.36e+06']   k=3: ['1.51e+24', '5.16e+90', 'nan']
+  beta=1.5  tail index a= 1.44  (a>2 finite var, a>3 finite 3rd moment)  L=10,20,40  k=2: ['1.94e+28', '6.41e+110', '4.71e+168']   k=3: ['1.91e+78', 'nan', 'nan']
+== B. predicted vs observed O(1/n) bias of mu~ at t=1 (oracle theta*) ==
+  beta=0.6  a=3.78  predicted n*bias -> 1.084  [check E_S[w] = e^{-alpha*(1)}: 1.5519 vs 1.5519]
+     n=   80  n*bias=   +0.48 (MC SE 0.44)   sd*sqrt(n)=1.541
+     n=  320  n*bias=   +2.56 (MC SE 0.87)   sd*sqrt(n)=1.532
+     n= 1280  n*bias=   -0.56 (MC SE 1.84)   sd*sqrt(n)=1.628
+  beta=1.5  a=1.44  predicted n*bias -> not defined (a<=3, third moment infinite)
+     n=   80  n*bias=  +13.98 (MC SE 0.83)   sd*sqrt(n)=2.945
+     n=  320  n*bias=  +30.86 (MC SE 2.87)   sd*sqrt(n)=5.066
+     n= 1280  n*bias=  +83.27 (MC SE 8.50)   sd*sqrt(n)=7.510
+== C. delta-method SE vs Monte-Carlo sd of mu~ (t=1, n=2000, 200 reps) ==
+  beta=0.6  delta SE 0.0342   MC sd 0.0347   ratio 0.99   MC mean -0.2509 (mu=-0.250)
+  beta=1.5  delta SE 0.5189   MC sd 0.2086   ratio 2.49   MC mean -0.2021 (mu=-0.250)
+== D. n_eff/n at t=1, n=2000, across 10 data seeds ==
+  beta=0.6  mean 0.713  sd 0.034  CV 0.048  min 0.670  max 0.760
+  beta=1.5  mean 0.122  sd 0.096  CV 0.790  min 0.007  max 0.321
+== E. survey bias E_S[Y]-mu over t, at the proposed default beta=0.6 ==
+  t=1:+0.454  t=2:+0.411  t=3:+0.369  t=4:+0.330  t=5:+0.293  t=6:+0.258  t=7:+0.226  t=8:+0.195  t=9:+0.168
+```
+STOP CONDITIONS checked against this output: none fired (A converges at 0.6/diverges at 1.5 as
+the theorem predicts; C ratio 0.99 at beta=0.6, within [0.75,1.33]; D CV=0.048 at beta=0.6,
+under 0.20).
+
+`python tools/twin_default_run.py` full stdout (config beta=0.6,H=32,lr=3e-3,wd=1e-5,epochs=400,
+batch=256,seed_data=0,seed_model=1; commit b4a438d):
+```
+config: {'m': 6, 'M': 9, 'n': 2000, 'sigma': 1.0, 'beta': 0.6, 'H': 32, 'lr': 0.003, 'wd': 1e-05, 'epochs': 400, 'batch': 256, 'val_frac': 0.2, 'seed_data': 0, 'seed_model': 1}
+best val 0.4455 at epoch 394
+FOC   : {1: 1.013, 2: 0.99, 3: 0.988, 4: 0.99, 5: 0.99, 6: 0.979}
+alpha~: [-0.375 -0.299 -0.186 -0.102 -0.034  0.   ]
+alpha*: [-0.439 -0.332 -0.234 -0.147 -0.069  0.   ]
+grid y            : [-3. -2. -1.  0.  1.  2.  3.  4.]
+theta~-theta*     : [ 5.71   0.075 -0.078 -0.058  0.028 -0.052 -0.047  0.17 ]
+centered (- mean over y in [-2,3]): [ 5.732  0.097 -0.056 -0.036  0.05  -0.03  -0.025  0.192]
+ t=7 mu=1.250 survey=1.505 mu~=1.313 oracle=1.298 neff/n=0.93  frac outside training range [-3.87,4.98]=0.0000
+ t=8 mu=1.500 survey=1.689 mu~=1.534 oracle=1.518 neff/n=0.96  frac outside training range [-3.87,4.98]=0.0000
+ t=9 mu=1.750 survey=1.943 mu~=1.779 oracle=1.751 neff/n=0.95  frac outside training range [-3.87,4.98]=0.0000
+```
+This matches EVERY reference number quoted in the task prompt exactly (best val, FOC range,
+alpha~, alpha*, theta~-theta* grid, mu~/oracle/n_eff at t=7,8,9) -- strong confirmation the
+environment (numpy/scipy versions) matches the prior session's.
+
+`python fusion_numpy.py` (its own CFG: lr=1e-2,wd=1e-4,epochs=150, now beta=0.6) full stdout:
+```
+4.3 grad-check worst rel. error: 9.030793659470643e-09
+5.2 best val loss 0.4469 at epoch 34
+5.3 FOC diagnostic (should be ~1): {1: np.float64(1.046), 2: np.float64(1.034), 3: np.float64(1.0), 4: np.float64(1.005), 5: np.float64(0.985), 6: np.float64(0.983)}
+    learned alpha: [-0.371 -0.269 -0.202 -0.099 -0.051  0.   ]
+    true    alpha: [-0.439 -0.332 -0.234 -0.147 -0.069  0.   ]
+
+ t   mu_true  survey_mean  mu_tilde  n_eff/n  offset_baseline  oracle_theta*
+ 7   1.250     1.505       1.286    0.92      1.247            1.298
+ 8   1.500     1.689       1.500    0.95      1.431            1.518
+ 9   1.750     1.943       1.708    0.92      1.685            1.751
+```
+
+`python -m pytest -v tests/` -> **14 passed, 0 failed** (T1..T11, all exist, none skipped):
+T1,T2,T3 (test_dgp.py); T4,T5,T6,T7,T8 (test_model_loss.py); T9,T10 (test_estimate.py);
+T11a,T11b,T11c,T11d (test_t11_weight_tails.py). Notably T7 -- the CP2-documented failure at the
+old beta=1.5 (a=1.0255 vs tol 0.02) -- now PASSES: at beta=0.6 the parametric-recovery fit
+converges with much lower variance (finite weight moments). No test hardcodes a beta=1.5-derived
+expected value; all expected values come from `dgp.*` closed-form functions parameterized by
+`cfg.beta`, so none needed hand re-deriving.
+
+Figures regenerated (all 9 kinds, previously at beta=1.5 hashes 4b6ab92b/8e4fef38, now at
+beta=0.6 hash 96169d0c): `python -m fusion.run --phase 1`, `--phase 3`
+(best_epoch 140, best_val_loss 0.4481, FOC {1:1.037,2:1.012,3:1.003,4:0.998,5:0.988,6:0.969}),
+`--phase 4`. Opened all 9 regenerated PNGs:
+- phase1a_densities: s_t sits only slightly right of p_t at every t (weaker separation than the
+  old beta=1.5 tails).
+- phase1b: mu(t)/E_St[Y] gap and rho_bar_t's hump are qualitatively the same shape as before.
+- phase3_val_curve: far smoother/flatter than the old beta=1.5 runs, converges by epoch ~140/400.
+- phase3_alpha_hat_vs_star: alpha~ sits uniformly above alpha* across t=1..5, meeting at the t=6
+  anchor -- a small roughly-constant offset (CLAUDE.md SS3's new reading rule: not a failure by
+  itself).
+- phase3_theta_hat_vs_star: NEW finding -- theta~ and theta* track closely for y<-2 and near 0,
+  but DIVERGE in the right tail (theta* plateaus near -0.4, theta~ keeps decreasing past y~2) --
+  opposite tail from the old beta=1.5 issue; flagged per the new extrapolation-reporting rule.
+- phase4_main_figure: mu~(t) tracks mu(t) closely in- and out-of-sample, better than survey mean,
+  comparable to the offset baseline.
+- phase4_stress1: bias -0.092/-0.160/-0.155 at drift 0.10/0.20/0.30 -- still non-monotonic.
+- phase4_stress2: 7.5% of t>m survey values outside training range; bias stays small
+  (-0.09 to -0.13).
+- phase4_stress3: sd(mu~) vs n tracks the 1/sqrt(n) reference closely.
+
+Discrepancies against the task prompt's reference numbers (Section B/C individual MC numbers use
+fresh randomness not claimed bit-reproducible, unlike twin_default_run.py's): section B's
+n*bias trajectory at beta=0.6 (+0.48,+2.56,-0.56 here vs quoted 0.68,0.80,0.93) and section C's
+beta=0.6 delta SE/MC sd (0.0342/0.0347 here vs quoted 0.0397/0.0360, quoted at 400 reps vs this
+script's 200) differ in the individual numbers while the qualitative phenomenon (flat sd*sqrt(n)
+at beta=0.6, ratio near 1) matches; section A, D, E numbers match the reference closely or
+exactly where directly comparable.

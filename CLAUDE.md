@@ -68,7 +68,9 @@ challenge's loss (2); the estimate is the self-normalised weighted survey mean
 
 ### 2.5 Checkpoints — stop, ask in ≤ 5 lines with a default, wait
 - CP0 after environment setup (show `python -c "import torch,numpy,scipy"` output).
-- CP1 DGP choice (before writing fusion/dgp.py).
+- CP1 DGP choice (before writing fusion/dgp.py). ANSWERED: the default is docs/math_fixed.md §D
+  with β=0.6. Re-ask only if a proposed change would violate (R3); any proposal must state the
+  tail index a and show a > 3.
 - CP2 after Phase 2 tests pass (show pytest output).
 - CP3 after first training run: show val curve, FOC table, θ̃ vs θ* figure; propose hyperparameters.
 - CP4 which stress tests to run (offer the three defaults).
@@ -82,12 +84,25 @@ challenge's loss (2); the estimate is the self-normalised weighted survey mean
   E_{S_t}[Y] = m_t + βσ² φ(a_t) / (sqrt(1+β²σ²) Φ(a_t));
   θ*(y) = log Φ(a_m) − log Φ(βy);  α*(t) = log Φ(a_t) − log Φ(a_m).
 - Pooled dataset F: rows (t,z,y); z=1 ↔ P_{t,Y}, z=0 ↔ S_t; n rows per (t,z); 2mn rows.
-- Model: r(t,y) = θ(y) + α[t], θ = MLP(1→H→H→1, ReLU), α ∈ R^m with α[m] ≡ 0 (frozen).
+- Model: r(t,y) = θ(y) + α[t], θ = MLP(1→H→1 by default (exact fusion_numpy.py shapes); depth
+  configurable, default depth=1; T4 runs at depth=1), α ∈ R^m with α[m] ≡ 0 (frozen).
 - Loss (challenge eq. 2), averaged over a batch:  L = mean( (1−z)·exp(r) − z·r ).
 - Per-row derivative: ∂L/∂r = (1−z)e^r − z.  α-gradient = sum of that over rows with T=t.
 - Estimator for t > m (needs no α):  μ̃(t) = Σ_i e^{θ̃(y_i)} y_i / Σ_i e^{θ̃(y_i)},  y_i ~ S_t.
 - Diagnostics: FOC mean_i e^{θ̃(y^S_{t,i})+α̃(t)} = 1 for t ≤ m;  n_eff = (Σw)²/Σw².
 - Baselines: survey mean ȳ_{S_t};  offset: μ(m) + (ȳ_{S_t} − ȳ_{S_m});  oracle: μ̃ with θ*.
+- (R3) βσ < 1/√2 for the default DGP; tail index a = 1 + 1/(β²σ²) must be stated whenever β or σ
+  is proposed or changed (docs/math_fixed.md §G).
+- Reading α̃: by the Step-8 FOC, α̃(t) = −log E_{S_t}[e^{θ̃}], a functional of θ̃ under year t's
+  survey law. An error in θ̃ that is constant where S_t has mass shifts α̃(t) by minus that
+  constant, and the anchor α(m)=0 pins θ̃'s level through year m alone, so other years inherit an
+  offset. μ̃ is invariant to any constant in θ̃ (Step 4). Therefore: judge θ̃ by the θ̃ − θ* grid
+  plot AFTER subtracting its mean over the data range (shape, not level), and judge μ̃ by the
+  oracle comparison. A small uniform offset of α̃ vs α* across t < m is not by itself a failure
+  and is not a reason to retrain.
+- Extrapolation: with every μ̃ report the fraction of t>m survey values falling outside
+  [min, max] of the training y, and max |θ̃ − θ*| over the region where the t>m surveys have
+  mass. If the fraction is > 0, offer the bounded head θ = B·tanh(·) at CP3.
 
 ## 4. Repo spec
 
@@ -124,3 +139,12 @@ figures/ slides/ LOG.md requirements.txt Makefile (test, figures, slides)
 - T9 oracle estimator: with θ* plugged in, |μ̃(t) − μ(t)| < 3·SE for t ∈ {m+1,…,M}, n=20k.
 - T10 trained estimator (report, then assert loosely): FOC within ±0.05 for all t ≤ m and
   |μ̃(t) − oracle μ̃(t)| < 0.05 for t > m on the default config; tighten at CP3.
+- T11 weight tails (uses the ORACLE θ*, so it tests the DGP and the estimator, not training):
+  (a) assert cfg.beta * cfg.sigma < 1/√2, with an assertion message quoting a = 1 +
+      1/(β²σ²) and rule (R3);
+  (b) n_eff/n at t=1, n=2000, over 10 data seeds: coefficient of variation (sd/mean) < 0.20;
+      print mean, sd, CV, min, max;
+  (c) SE calibration at t=1, n=2000: delta-method SE from one sample vs sd of μ̃ over 200 fresh
+      samples; assert the ratio is in [0.75, 1.33]; print both numbers;
+  (d) report-only, no assertion: n*(mean μ̃ − μ) at n = 80, 320, 1280 with 1000 reps, printed
+      next to the predicted constant −E_S[w²(Y−μ)]/E_S[w]² from numerical integration.
